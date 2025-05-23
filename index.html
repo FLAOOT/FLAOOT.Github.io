@@ -1,45 +1,276 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
+    <title>BlockCraft Mobile/PC</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BlockGram</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --primary: #0088cc;
+            --bg: #2c2c2c;
+            --text: #fff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            background: #87CEEB;
+        }
+
+        /* Game Canvas */
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            touch-action: none;
+        }
+
+        /* Top Right Menu */
+        .menu-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .menu {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.9);
+            color: var(--text);
+            padding: 20px;
+            border-radius: 12px;
+            width: 250px;
+            display: none;
+            z-index: 1001;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* Mobile Controls */
+        #mobileControls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+        }
+
+        .joystick {
+            width: 100px;
+            height: 100px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+        }
+
+        #jumpBtn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.3);
+            border: none;
+            color: white;
+            font-size: 24px;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            #mobileControls, #jumpBtn { display: block; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Game Menu -->
-    <div class="mc-menu" id="mainMenu">
-        <div class="menu-item" onclick="Game.start()">
-            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAX0lEQVR4nO2UMQ4AIQgE+f8/2l5sPIhRY2Fic9jJzC4A/4g5yLm6u1eQd/d1nE7nCwLJm2QkHwCQ3CQBSG4SgOQmAUhuEoDkJgFIbhKA5CYBSG4SgOQm9QH0XAc0qDzhqgAAAABJRU5ErkJggg==" class="menu-icon">
-            <span data-lang="play">Играть</span>
-        </div>
-        <div class="menu-item" onclick="UI.showSettings()">
-            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAm0lEQVR4nO2UMQ4AIQhE/f9PdmNj42Fk1VhYWJ6wM7sLwD9iDnKu7u4V5N19HafT+YJAsiaZkQcAJCeJAJJJApCcJADJTQKQ3CQAyU0CkNwkAMlNApDcJADJTeoD6LkOaFB5wlUBkiu5CkByFYDkKgDJVQCSqwAkVwFIrgKQXAUguQpAcpP6AHquAxpUnnBVAJJ7AF2mASX+YxWjAAAAAElFTkSuQmCC" class="menu-icon">
-            <span data-lang="settings">Настройки</span>
-        </div>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    <div class="menu" id="menu">
+        <button class="close-btn" onclick="toggleMenu()">×</button>
+        <h2>Меню</h2>
+        <div class="menu-item" onclick="saveGame()">Сохранить</div>
+        <div class="menu-item" onclick="loadGame()">Загрузить</div>
+        <div class="menu-item" onclick="toggleControls()">Управление</div>
     </div>
 
-    <!-- Settings Modal -->
-    <div class="settings-modal" id="settingsModal">
-        <h2 data-lang="settings">Настройки</h2>
-        
-        <h3 data-lang="language">Язык</h3>
-        <select class="lang-select" id="languageSelect">
-            <option value="ru">Русский</option>
-            <option value="en">English</option>
-        </select>
-
-        <h3 data-lang="color">Цвет интерфейса</h3>
-        <div class="color-picker">
-            <div class="color-option" style="background: #0088cc" onclick="UI.changeColor('#0088cc')"></div>
-            <div class="color-option" style="background: #4CAF50" onclick="UI.changeColor('#4CAF50')"></div>
-            <div class="color-option" style="background: #FF5722" onclick="UI.changeColor('#FF5722')"></div>
-            <div class="color-option" style="background: #9C27B0" onclick="UI.changeColor('#9C27B0')"></div>
-            <div class="color-option" style="background: #607D8B" onclick="UI.changeColor('#607D8B')"></div>
-        </div>
+    <div id="mobileControls">
+        <div class="joystick" id="joystick"></div>
     </div>
+    <button id="jumpBtn" ontouchstart="jump()">▲</button>
 
-    <script src="game.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.8.5/dist/nipplejs.min.js"></script>
+    <script>
+        let scene, camera, renderer, player;
+        let moveX = 0, moveZ = 0;
+        let isJumping = false;
+        let inventory = { blocks: 10 };
+
+        // Инициализация игры
+        function initGame() {
+            // Настройка Three.js
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.id = 'gameCanvas';
+            document.body.appendChild(renderer.domElement);
+
+            // Освещение
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(100, 100, 100);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Игрок
+            player = new THREE.Mesh(
+                new THREE.CapsuleGeometry(0.5, 2),
+                new THREE.MeshPhongMaterial({ color: 0x00ff00 })
+            );
+            player.position.y = 10;
+            scene.add(player);
+
+            // Генерация мира
+            generateWorld();
+            animate();
+
+            // Управление
+            initControls();
+        }
+
+        function generateWorld() {
+            // Генерация земли
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(100, 100),
+                new THREE.MeshPhongMaterial({ color: 0x4CAF50 })
+            );
+            ground.rotation.x = -Math.PI/2;
+            scene.add(ground);
+        }
+
+        // Игровой цикл
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Движение
+            player.position.x += moveX;
+            player.position.z += moveZ;
+            
+            // Гравитация
+            if(!isJumping && player.position.y > 1) {
+                player.position.y -= 0.5;
+            }
+
+            // Обновление камеры
+            camera.position.set(
+                player.position.x + 5,
+                player.position.y + 5,
+                player.position.z + 5
+            );
+            camera.lookAt(player.position);
+
+            renderer.render(scene, camera);
+        }
+
+        // Система управления
+        function initControls() {
+            // Клавиатура
+            window.addEventListener('keydown', e => {
+                switch(e.key) {
+                    case 'w': moveZ = -0.1; break;
+                    case 's': moveZ = 0.1; break;
+                    case 'a': moveX = -0.1; break;
+                    case 'd': moveX = 0.1; break;
+                    case ' ': jump(); break;
+                }
+            });
+
+            window.addEventListener('keyup', e => {
+                switch(e.key) {
+                    case 'w':
+                    case 's': moveZ = 0; break;
+                    case 'a':
+                    case 'd': moveX = 0; break;
+                }
+            });
+
+            // Мобильный джойстик
+            const manager = nipplejs.create({
+                zone: document.getElementById('joystick'),
+                mode: 'static'
+            });
+
+            manager.on('move', (evt, data) => {
+                moveX = data.vector.x * 0.1;
+                moveZ = data.vector.y * 0.1;
+            });
+
+            manager.on('end', () => {
+                moveX = 0;
+                moveZ = 0;
+            });
+        }
+
+        function jump() {
+            if(!isJumping) {
+                isJumping = true;
+                player.position.y += 2;
+                setTimeout(() => isJumping = false, 1000);
+            }
+        }
+
+        // Меню
+        function toggleMenu() {
+            const menu = document.getElementById('menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function saveGame() {
+            localStorage.setItem('gameData', JSON.stringify({
+                position: player.position,
+                inventory: inventory
+            }));
+            alert('Игра сохранена!');
+        }
+
+        function loadGame() {
+            const data = JSON.parse(localStorage.getItem('gameData'));
+            if(data) {
+                player.position.copy(data.position);
+                inventory = data.inventory;
+                alert('Игра загружена!');
+            }
+        }
+
+        // Запуск игры
+        initGame();
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+    </script>
 </body>
 </html>
