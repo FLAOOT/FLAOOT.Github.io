@@ -3,15 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Browser</title>
+    <title>Smart Browser</title>
     <style>
-        /* Все предыдущие стили остаются */
         :root {
             --bg-color: #1a1a1a;
             --primary-color: #2aabee;
             --text-color: #ffffff;
+            --button-radius: 8px;
         }
-        /* ... остальные стили ... */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            align-items: center;
+        }
+
+        button {
+            background: var(--primary-color);
+            border: none;
+            color: var(--text-color);
+            padding: 8px 16px;
+            border-radius: var(--button-radius);
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: var(--button-radius);
+            background: rgba(255,255,255,0.1);
+            color: var(--text-color);
+            font-size: 16px;
+        }
+
+        iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: white;
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 300px;
+            height: 100%;
+            background: var(--bg-color);
+            padding: 20px;
+            transition: right 0.3s;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        .settings-open {
+            right: 0;
+        }
+
+        .color-picker {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-wrap: wrap;
+                padding: 10px;
+            }
+            
+            button {
+                padding: 6px 12px;
+            }
+            
+            input[type="text"] {
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -19,14 +110,33 @@
         <button onclick="goBack()">←</button>
         <button onclick="goForward()">→</button>
         <button onclick="reloadPage()">↻</button>
-        <input type="text" id="urlInput" placeholder="Search with Google">
+        <input type="text" id="urlInput" placeholder="Search or enter address">
         <button onclick="navigate()">Go</button>
+        <button onclick="toggleSettings()">⚙</button>
     </div>
 
-    <iframe id="browserFrame" src="https://www.google.com"></iframe>
+    <iframe id="browserFrame" src="https://duckduckgo.com"></iframe>
+
+    <div class="settings-panel" id="settingsPanel">
+        <h3>Customization</h3>
+        <div class="color-picker">
+            <div>
+                <label>Background Color:</label>
+                <input type="color" id="bgColor" onchange="updateColor('bg-color', this.value)">
+            </div>
+            <div>
+                <label>Button Color:</label>
+                <input type="color" id="primaryColor" onchange="updateColor('primary-color', this.value)">
+            </div>
+            <div>
+                <label>Text Color:</label>
+                <input type="color" id="textColor" onchange="updateColor('text-color', this.value)">
+            </div>
+        </div>
+        <button onclick="resetColors()">Reset to Default</button>
+    </div>
 
     <script>
-        // Исправленный рабочий поиск
         function navigate() {
             const input = document.getElementById('urlInput').value.trim();
             let url;
@@ -34,14 +144,12 @@
             if (isValidUrl(input)) {
                 url = input.startsWith('http') ? input : `https://${input}`;
             } else {
-                // Используем Google Поиск
-                url = `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+                url = `https://duckduckgo.com/?q=${encodeURIComponent(input)}`;
             }
             
             document.getElementById('browserFrame').src = url;
         }
 
-        // Проверка URL
         function isValidUrl(string) {
             try {
                 new URL(string);
@@ -51,7 +159,61 @@
             }
         }
 
-        // Остальные функции остаются без изменений
+        function goBack() {
+            const frame = document.getElementById('browserFrame');
+            try {
+                frame.contentWindow.history.back();
+            } catch (error) {
+                alert("Can't go back");
+            }
+        }
+
+        function goForward() {
+            const frame = document.getElementById('browserFrame');
+            try {
+                frame.contentWindow.history.forward();
+            } catch (error) {
+                alert("Can't go forward");
+            }
+        }
+
+        function reloadPage() {
+            const frame = document.getElementById('browserFrame');
+            frame.contentWindow.location.reload();
+        }
+
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('settings-open');
+        }
+
+        function updateColor(variable, value) {
+            document.documentElement.style.setProperty(`--${variable}`, value);
+            localStorage.setItem(variable, value);
+        }
+
+        function resetColors() {
+            document.documentElement.style.setProperty('--bg-color', '#1a1a1a');
+            document.documentElement.style.setProperty('--primary-color', '#2aabee');
+            document.documentElement.style.setProperty('--text-color', '#ffffff');
+            localStorage.clear();
+        }
+
+        // Load saved colors
+        function loadSettings() {
+            const bg = localStorage.getItem('bg-color') || '#1a1a1a';
+            const primary = localStorage.getItem('primary-color') || '#2aabee';
+            const text = localStorage.getItem('text-color') || '#ffffff';
+            
+            updateColor('bg-color', bg);
+            updateColor('primary-color', primary);
+            updateColor('text-color', text);
+        }
+
+        // Initialize
+        loadSettings();
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') navigate();
+        });
     </script>
 </body>
 </html>
