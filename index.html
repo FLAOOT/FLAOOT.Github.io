@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Browser</title>
+    <title>Ultimate Browser</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -66,42 +66,35 @@
             background: white;
         }
 
-        .settings-panel {
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
             position: fixed;
-            top: 0;
-            right: -300px;
-            width: 300px;
-            height: 100%;
-            background: var(--bg-color);
-            padding: 20px;
-            transition: right 0.3s;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
         }
 
-        .settings-open {
-            right: 0;
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        .color-picker {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        @media (max-width: 768px) {
-            .toolbar {
-                flex-wrap: wrap;
-                padding: 10px;
-            }
-            
-            button {
-                padding: 6px 12px;
-            }
-            
-            input[type="text"] {
-                font-size: 14px;
-            }
+        .error-message {
+            color: #ff4444;
+            padding: 10px;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            border-radius: 5px;
+            display: none;
         }
     </style>
 </head>
@@ -112,108 +105,105 @@
         <button onclick="reloadPage()">↻</button>
         <input type="text" id="urlInput" placeholder="Search or enter address">
         <button onclick="navigate()">Go</button>
-        <button onclick="toggleSettings()">⚙</button>
     </div>
 
-    <iframe id="browserFrame" src="https://duckduckgo.com"></iframe>
-
-    <div class="settings-panel" id="settingsPanel">
-        <h3>Customization</h3>
-        <div class="color-picker">
-            <div>
-                <label>Background Color:</label>
-                <input type="color" id="bgColor" onchange="updateColor('bg-color', this.value)">
-            </div>
-            <div>
-                <label>Button Color:</label>
-                <input type="color" id="primaryColor" onchange="updateColor('primary-color', this.value)">
-            </div>
-            <div>
-                <label>Text Color:</label>
-                <input type="color" id="textColor" onchange="updateColor('text-color', this.value)">
-            </div>
-        </div>
-        <button onclick="resetColors()">Reset to Default</button>
-    </div>
+    <div class="loader" id="loader"></div>
+    <div class="error-message" id="errorMsg"></div>
+    <iframe id="browserFrame" src="https://search.brave.com"></iframe>
 
     <script>
-        function navigate() {
-            const input = document.getElementById('urlInput').value.trim();
-            let url;
-            
-            if (isValidUrl(input)) {
-                url = input.startsWith('http') ? input : `https://${input}`;
-            } else {
-                url = `https://duckduckgo.com/?q=${encodeURIComponent(input)}`;
-            }
-            
-            document.getElementById('browserFrame').src = url;
+        let history = [];
+        let currentIndex = -1;
+        let isLoading = false;
+
+        function showLoader() {
+            document.getElementById('loader').style.display = 'block';
+            isLoading = true;
         }
 
-        function isValidUrl(string) {
+        function hideLoader() {
+            document.getElementById('loader').style.display = 'none';
+            isLoading = false;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => errorDiv.style.display = 'none', 3000);
+        }
+
+        function normalizeUrl(url) {
             try {
-                new URL(string);
-                return true;
-            } catch (_) {
-                return /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(string);
+                const urlObj = new URL(url);
+                if (!urlObj.protocol.startsWith('http')) {
+                    return `https://${url}`;
+                }
+                return url;
+            } catch {
+                return `https://search.brave.com/search?q=${encodeURIComponent(url)}`;
             }
+        }
+
+        function navigate() {
+            const input = document.getElementById('urlInput').value.trim();
+            if (!input) return;
+
+            showLoader();
+            const normalizedUrl = normalizeUrl(input);
+            
+            const frame = document.getElementById('browserFrame');
+            frame.src = normalizedUrl;
+            
+            frame.onload = () => {
+                hideLoader();
+                if (history[currentIndex] !== normalizedUrl) {
+                    history = history.slice(0, currentIndex + 1);
+                    history.push(normalizedUrl);
+                    currentIndex++;
+                }
+            };
+
+            frame.onerror = () => {
+                hideLoader();
+                showError('Failed to load page');
+            };
         }
 
         function goBack() {
-            const frame = document.getElementById('browserFrame');
-            try {
-                frame.contentWindow.history.back();
-            } catch (error) {
-                alert("Can't go back");
+            if (currentIndex > 0) {
+                currentIndex--;
+                loadHistoryUrl();
             }
         }
 
         function goForward() {
-            const frame = document.getElementById('browserFrame');
-            try {
-                frame.contentWindow.history.forward();
-            } catch (error) {
-                alert("Can't go forward");
+            if (currentIndex < history.length - 1) {
+                currentIndex++;
+                loadHistoryUrl();
             }
         }
 
-        function reloadPage() {
+        function loadHistoryUrl() {
             const frame = document.getElementById('browserFrame');
-            frame.contentWindow.location.reload();
+            frame.src = history[currentIndex];
+            document.getElementById('urlInput').value = history[currentIndex];
         }
 
-        function toggleSettings() {
-            document.getElementById('settingsPanel').classList.toggle('settings-open');
+        function reloadPage() {
+            if (!isLoading) {
+                const frame = document.getElementById('browserFrame');
+                frame.contentWindow.location.reload();
+            }
         }
 
-        function updateColor(variable, value) {
-            document.documentElement.style.setProperty(`--${variable}`, value);
-            localStorage.setItem(variable, value);
-        }
-
-        function resetColors() {
-            document.documentElement.style.setProperty('--bg-color', '#1a1a1a');
-            document.documentElement.style.setProperty('--primary-color', '#2aabee');
-            document.documentElement.style.setProperty('--text-color', '#ffffff');
-            localStorage.clear();
-        }
-
-        // Load saved colors
-        function loadSettings() {
-            const bg = localStorage.getItem('bg-color') || '#1a1a1a';
-            const primary = localStorage.getItem('primary-color') || '#2aabee';
-            const text = localStorage.getItem('text-color') || '#ffffff';
-            
-            updateColor('bg-color', bg);
-            updateColor('primary-color', primary);
-            updateColor('text-color', text);
-        }
-
-        // Initialize
-        loadSettings();
+        // Обработчик ввода URL
         document.getElementById('urlInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') navigate();
         });
+
+        // Инициализация
+        navigate();
     </script>
 </body>
 </html>
