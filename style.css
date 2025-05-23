@@ -1,1 +1,108 @@
+:root {
+    --tg-blue: #0088cc;
+    --tg-bg: #ffffff;
+    --tg-text: #000000;
+    --tg-radius: 12px;
+    --tg-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
 
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background: #87CEEB;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Game Canvas */
+#gameCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: none;
+}
+
+/* Minecraft-like Menu with Telegram Style */
+.mc-menu {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--tg-bg);
+    border-radius: var(--tg-radius);
+    padding: 15px;
+    box-shadow: var(--tg-shadow);
+    width: 280px;
+    transition: 0.3s all;
+}
+
+.menu-item {
+    background: rgba(0,0,0,0.05);
+    padding: 14px 20px;
+    margin: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: 0.2s all;
+}
+
+.menu-item:hover {
+    background: rgba(0,0,0,0.08);
+    transform: translateX(5px);
+}
+
+.menu-icon {
+    width: 24px;
+    height: 24px;
+    filter: brightness(0.8);
+}
+
+/* Settings Modal */
+.settings-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--tg-bg);
+    padding: 25px;
+    border-radius: var(--tg-radius);
+    box-shadow: var(--tg-shadow);
+    max-width: 400px;
+    display: none;
+}
+
+.color-picker {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.color-option {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: 0.2s all;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+}
+
+.lang-select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.1);
+    margin: 10px 0;
+    background: rgba(0,0,0,0.03);
+}
