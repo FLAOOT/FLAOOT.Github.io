@@ -4,125 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BlockGram</title>
-    <style>
-        :root {
-            --tg-blue: #0088cc;
-            --tg-bg: #ffffff;
-            --tg-text: #000000;
-            --tg-radius: 12px;
-            --tg-shadow: 0 2px 12px rgba(0,0,0,0.1);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
-        }
-
-        body {
-            background: #87CEEB;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* Minecraft-like Menu with Telegram Style */
-        .mc-menu {
-            position: fixed;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: var(--tg-bg);
-            border-radius: var(--tg-radius);
-            padding: 15px;
-            box-shadow: var(--tg-shadow);
-            width: 280px;
-            transition: 0.3s all;
-        }
-
-        .menu-item {
-            background: rgba(0,0,0,0.05);
-            padding: 14px 20px;
-            margin: 8px 0;
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: 0.2s all;
-        }
-
-        .menu-item:hover {
-            background: rgba(0,0,0,0.08);
-            transform: translateX(5px);
-        }
-
-        .menu-icon {
-            width: 24px;
-            height: 24px;
-            filter: brightness(0.8);
-        }
-
-        /* Settings Modal */
-        .settings-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--tg-bg);
-            padding: 25px;
-            border-radius: var(--tg-radius);
-            box-shadow: var(--tg-shadow);
-            max-width: 400px;
-            display: none;
-        }
-
-        .color-picker {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin: 15px 0;
-        }
-
-        .color-option {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: 0.2s all;
-        }
-
-        .color-option:hover {
-            transform: scale(1.1);
-        }
-
-        /* Language Selector */
-        .lang-select {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid rgba(0,0,0,0.1);
-            margin: 10px 0;
-            background: rgba(0,0,0,0.03);
-        }
-
-        /* Game Canvas */
-        #gameCanvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <!-- Game Menu -->
-    <div class="mc-menu">
-        <div class="menu-item" onclick="startGame()">
+    <div class="mc-menu" id="mainMenu">
+        <div class="menu-item" onclick="Game.start()">
             <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAX0lEQVR4nO2UMQ4AIQgE+f8/2l5sPIhRY2Fic9jJzC4A/4g5yLm6u1eQd/d1nE7nCwLJm2QkHwCQ3CQBSG4SgOQmAUhuEoDkJgFIbhKA5CYBSG4SgOQm9QH0XAc0qDzhqgAAAABJRU5ErkJggg==" class="menu-icon">
             <span data-lang="play">Играть</span>
         </div>
-        <div class="menu-item" onclick="showSettings()">
+        <div class="menu-item" onclick="UI.showSettings()">
             <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAm0lEQVR4nO2UMQ4AIQhE/f9PdmNj42Fk1VhYWJ6wM7sLwD9iDnKu7u4V5N19HafT+YJAsiaZkQcAJCeJAJJJApCcJADJTQKQ3CQAyU0CkNwkAMlNApDcJADJTeoD6LkOaFB5wlUBkiu5CkByFYDkKgDJVQCSqwAkVwFIrgKQXAUguQpAcpP6AHquAxpUnnBVAJJ7AF2mASX+YxWjAAAAAElFTkSuQmCC" class="menu-icon">
             <span data-lang="settings">Настройки</span>
         </div>
@@ -133,68 +25,21 @@
         <h2 data-lang="settings">Настройки</h2>
         
         <h3 data-lang="language">Язык</h3>
-        <select class="lang-select" onchange="changeLanguage(this.value)">
+        <select class="lang-select" id="languageSelect">
             <option value="ru">Русский</option>
             <option value="en">English</option>
         </select>
 
         <h3 data-lang="color">Цвет интерфейса</h3>
         <div class="color-picker">
-            <div class="color-option" style="background: #0088cc" onclick="changeColor('#0088cc')"></div>
-            <div class="color-option" style="background: #4CAF50" onclick="changeColor('#4CAF50')"></div>
-            <div class="color-option" style="background: #FF5722" onclick="changeColor('#FF5722')"></div>
-            <div class="color-option" style="background: #9C27B0" onclick="changeColor('#9C27B0')"></div>
-            <div class="color-option" style="background: #607D8B" onclick="changeColor('#607D8B')"></div>
+            <div class="color-option" style="background: #0088cc" onclick="UI.changeColor('#0088cc')"></div>
+            <div class="color-option" style="background: #4CAF50" onclick="UI.changeColor('#4CAF50')"></div>
+            <div class="color-option" style="background: #FF5722" onclick="UI.changeColor('#FF5722')"></div>
+            <div class="color-option" style="background: #9C27B0" onclick="UI.changeColor('#9C27B0')"></div>
+            <div class="color-option" style="background: #607D8B" onclick="UI.changeColor('#607D8B')"></div>
         </div>
     </div>
 
-    <script>
-        // Локализация
-        const translations = {
-            ru: {
-                play: "Играть",
-                settings: "Настройки",
-                language: "Язык",
-                color: "Цвет интерфейса"
-            },
-            en: {
-                play: "Play",
-                settings: "Settings",
-                language: "Language",
-                color: "Interface Color"
-            }
-        };
-
-        function changeLanguage(lang) {
-            document.querySelectorAll('[data-lang]').forEach(el => {
-                const key = el.getAttribute('data-lang');
-                el.textContent = translations[lang][key];
-            });
-        }
-
-        // Смена цвета интерфейса
-        function changeColor(color) {
-            document.documentElement.style.setProperty('--tg-blue', color);
-        }
-
-        // Управление модальными окнами
-        function showSettings() {
-            document.getElementById('settingsModal').style.display = 'block';
-        }
-
-        window.onclick = function(event) {
-            if (event.target === document.getElementById('settingsModal')) {
-                document.getElementById('settingsModal').style.display = 'none';
-            }
-        }
-
-        // Заглушка для запуска игры
-        function startGame() {
-            alert('Игра началась!');
-        }
-
-        // Инициализация языка по умолчанию
-        changeLanguage('ru');
-    </script>
+    <script src="game.js"></script>
 </body>
 </html>
