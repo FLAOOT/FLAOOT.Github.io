@@ -1,211 +1,283 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="mul">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Universal Browser</title>
     <style>
-        /* ... предыдущие стили ... */
+        :root {
+            --bg-color: #18222d;
+            --text-color: #ffffff;
+            --primary-color: #2aabee;
+            --hover-color: #2294d6;
+            --border-radius: 8px;
+            --sidebar-width: 250px;
+        }
 
-        /* Новые элементы для медиа-поиска */
-        .search-type {
-            padding: 8px;
-            border-radius: var(--border-radius);
-            margin-left: 10px;
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
             background: var(--bg-color);
             color: var(--text-color);
-            border: 1px solid var(--secondary-color);
+            transition: all 0.3s;
         }
 
-        .media-results {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 15px;
-            padding: 20px;
+        .container {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
         }
 
-        .media-item {
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            background: var(--secondary-color);
-            transition: transform 0.2s ease;
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                display: none;
+            }
+            
+            .mobile-menu-btn {
+                display: block !important;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 1000;
+            }
+            
+            .toolbar {
+                flex-wrap: wrap;
+                padding: 10px;
+            }
+            
+            .tab {
+                max-width: 120px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            #browserFrame {
+                height: calc(100vh - 200px);
+            }
         }
 
-        .media-item:hover {
-            transform: translateY(-3px);
-        }
-
-        .media-thumbnail {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-        }
-
-        .media-info {
+        /* Общие стили */
+        .tab-bar {
+            display: flex;
+            background: #1f2d3b;
             padding: 10px;
+            overflow-x: auto;
         }
 
-        .language-selector {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 8px;
-            border-radius: var(--border-radius);
+        .tab {
+            background: #2a3a4b;
+            padding: 10px 20px;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: #1f2d3b;
+            align-items: center;
+        }
+
+        button {
             background: var(--primary-color);
+            border: none;
             color: white;
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 40px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            background: #2a3a4b;
+            color: var(--text-color);
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #1f2d3b;
+            padding: 20px;
+            transition: transform 0.3s;
+        }
+
+        #browserFrame {
+            width: 100%;
+            height: calc(100vh - 120px);
+            border: none;
+        }
+
+        /* Мультиязычные стили */
+        .lang-switcher {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <!-- Добавляем селектор языка -->
-    <select class="language-selector" id="languageSelector" onchange="changeLanguage(this.value)">
-        <option value="en">English</option>
-        <option value="es">Español</option>
-        <option value="fr">Français</option>
-        <option value="de">Deutsch</option>
-        <option value="ru">Русский</option>
-    </select>
-
-    <!-- Модифицированная панель управления -->
-    <div class="controls">
-        <!-- ... другие элементы ... -->
-        <select class="search-type" id="searchType">
-            <option value="web">Web</option>
-            <option value="images">Images</option>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
+    <div class="lang-switcher">
+        <select id="language" onchange="changeLanguage(this.value)">
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+            <option value="es">Español</option>
+            <option value="zh">中文</option>
+            <option value="ar">العربية</option>
         </select>
     </div>
 
-    <!-- Контейнер для результатов -->
-    <div class="media-results" id="resultsContainer"></div>
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <div class="profile">
+                <h3 data-i18n="profile">Profile</h3>
+                <select id="profiles"></select>
+                <button onclick="addProfile()" data-i18n="add">Add</button>
+            </div>
+            <div class="bookmarks">
+                <h3 data-i18n="bookmarks">Bookmarks</h3>
+                <ul id="bookmarksList"></ul>
+                <button onclick="addBookmark()" data-i18n="add">Add</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tab-bar" id="tabBar"></div>
+            <div class="toolbar">
+                <button onclick="goBack()">←</button>
+                <button onclick="goForward()">→</button>
+                <button onclick="reloadPage()">↻</button>
+                <input type="text" id="urlInput" data-i18n-placeholder="enterUrl">
+                <button onclick="navigate()" data-i18n="go">Go</button>
+                <button class="mobile-menu-btn" onclick="toggleMenu()" style="display: none;">☰</button>
+            </div>
+            <div class="quick-search">
+                <button onclick="search('images')" data-i18n="images">Images</button>
+                <button onclick="search('videos')" data-i18n="videos">Videos</button>
+                <button onclick="search('music')" data-i18n="music">Music</button>
+                <button onclick="search('news')" data-i18n="news">News</button>
+            </div>
+            <iframe id="browserFrame" src="https://google.com"></iframe>
+        </div>
+    </div>
 
     <script>
-        // Локализации
+        // Мультиязычная поддержка
         const translations = {
             en: {
-                searchPlaceholder: "Search or enter address",
-                web: "Web",
+                profile: "Profile",
+                bookmarks: "Bookmarks",
+                add: "Add",
+                enterUrl: "Enter URL or search",
+                go: "Go",
                 images: "Images",
-                video: "Video",
-                audio: "Audio",
-                // ... другие переводы
+                videos: "Videos",
+                music: "Music",
+                news: "News"
+            },
+            ru: {
+                profile: "Профиль",
+                bookmarks: "Закладки",
+                add: "Добавить",
+                enterUrl: "Введите URL или запрос",
+                go: "Перейти",
+                images: "Картинки",
+                videos: "Видео",
+                music: "Музыка",
+                news: "Новости"
             },
             es: {
-                searchPlaceholder: "Buscar o ingresar URL",
-                web: "Web",
+                profile: "Perfil",
+                bookmarks: "Marcadores",
+                add: "Añadir",
+                enterUrl: "Ingrese URL o búsqueda",
+                go: "Ir",
                 images: "Imágenes",
-                video: "Video",
-                audio: "Audio",
-                // ...
+                videos: "Videos",
+                music: "Música",
+                news: "Noticias"
             },
-            // ... другие языки
+            zh: {
+                profile: "轮廓",
+                bookmarks: "书签",
+                add: "添加",
+                enterUrl: "输入网址或搜索",
+                go: "去",
+                images: "图片",
+                videos: "视频",
+                music: "音乐",
+                news: "新闻"
+            },
+            ar: {
+                profile: "الملف الشخصي",
+                bookmarks: "العلامات المرجعية",
+                add: "إضافة",
+                enterUrl: "أدخل الرابط أو البحث",
+                go: "اذهب",
+                images: "الصور",
+                videos: "مقاطع فيديو",
+                music: "موسيقى",
+                news: "أخبار"
+            }
         };
 
-        let currentLanguage = 'en';
-
         function changeLanguage(lang) {
-            currentLanguage = lang;
-            applyTranslations();
-            localStorage.setItem('language', lang);
-        }
-
-        function applyTranslations() {
-            document.getElementById('searchInput').placeholder = 
-                translations[currentLanguage].searchPlaceholder;
-            document.querySelectorAll('#searchType option').forEach((opt, index) => {
-                opt.textContent = translations[currentLanguage][Object.keys(translations.en).filter(k => k !== 'searchPlaceholder')[index]];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = translations[lang][el.dataset.i18n];
             });
-            // Обновить другие элементы интерфейса
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.placeholder = translations[lang][el.dataset.i18nPlaceholder];
+            });
+            localStorage.setItem('browserLanguage', lang);
         }
 
-        // Медиа-поиск
-        async function searchContent(query, type) {
-            const API_KEYS = {
-                GOOGLE: 'YOUR_GOOGLE_API_KEY',
-                YOUTUBE: 'YOUR_YOUTUBE_API_KEY',
-                PIXABAY: 'YOUR_PIXABAY_API_KEY'
-            };
-
-            let endpoint;
-            switch(type) {
-                case 'images':
-                    endpoint = `https://pixabay.com/api/?key=${API_KEYS.PIXABAY}&q=${query}&image_type=photo`;
-                    break;
-                case 'video':
-                    endpoint = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&key=${API_KEYS.YOUTUBE}`;
-                    break;
-                case 'audio':
-                    endpoint = `https://api.spotify.com/v1/search?q=${query}&type=track`;
-                    break;
-                default:
-                    return performWebSearch(query);
-            }
-
-            try {
-                const response = await fetch(endpoint);
-                const data = await response.json();
-                displayResults(data, type);
-            } catch (error) {
-                console.error('Search error:', error);
-            }
-        }
-
-        function displayResults(data, type) {
-            const container = document.getElementById('resultsContainer');
-            container.innerHTML = '';
-
-            switch(type) {
-                case 'images':
-                    data.hits.forEach(img => {
-                        container.innerHTML += `
-                            <div class="media-item">
-                                <img src="${img.webformatURL}" class="media-thumbnail">
-                                <div class="media-info">${img.tags}</div>
-                            </div>
-                        `;
-                    });
-                    break;
-                case 'video':
-                    data.items.forEach(video => {
-                        container.innerHTML += `
-                            <div class="media-item">
-                                <iframe src="https://youtube.com/embed/${video.id.videoId}" 
-                                    frameborder="0" allowfullscreen></iframe>
-                            </div>
-                        `;
-                    });
-                    break;
-                case 'audio':
-                    data.tracks.items.forEach(track => {
-                        container.innerHTML += `
-                            <div class="media-item">
-                                <audio controls src="${track.preview_url}"></audio>
-                                <div class="media-info">${track.name}</div>
-                            </div>
-                        `;
-                    });
-                    break;
-            }
+        // Мобильное меню
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none';
         }
 
         // Инициализация
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedLang = localStorage.getItem('language') || 'en';
+        function init() {
+            const savedLang = localStorage.getItem('browserLanguage') || 'en';
+            document.getElementById('language').value = savedLang;
             changeLanguage(savedLang);
-            document.getElementById('languageSelector').value = savedLang;
-        });
-
-        // Модифицированная функция поиска
-        function performSearch() {
-            const query = document.getElementById('searchInput').value;
-            const type = document.getElementById('searchType').value;
+            loadProfiles();
+            createNewTab();
+            loadSettings();
             
-            if(type === 'web') {
-                navigateToUrl(query);
-            } else {
-                searchContent(query, type);
-            }
+            // Сенсорные жесты
+            let touchStartX = 0;
+            document.addEventListener('touchstart', e => {
+                touchStartX = e.touches[0].clientX;
+            });
+            document.addEventListener('touchend', e => {
+                const deltaX = e.changedTouches[0].clientX - touchStartX;
+                if (Math.abs(deltaX) > 50) {
+                    deltaX > 0 ? goBack() : goForward();
+                }
+            });
         }
+
+        // Остальные функции из предыдущего кода остаются без изменений
+        // (навигация, работа с вкладками, профилями и т.д.)
+
+        window.onload = init;
     </script>
 </body>
 </html>
