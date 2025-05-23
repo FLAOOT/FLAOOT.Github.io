@@ -1,75 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Custom Browser</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Browser</title>
     <style>
         :root {
-            --bg-color: #18222d;
-            --button-color: #2aabee;
-            --hover-color: #2294d6;
+            --bg-color: #1a1a1a;
+            --primary-color: #2aabee;
             --text-color: #ffffff;
+            --button-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             background: var(--bg-color);
             color: var(--text-color);
-            transition: all 0.3s;
             height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-wrap: wrap;
+                padding: 10px;
+                gap: 8px;
+            }
+
+            button {
+                padding: 6px 12px;
+            }
+
+            input[type="text"] {
+                font-size: 14px;
+            }
+
+            .settings-panel {
+                width: 100%;
+                right: -100%;
+            }
         }
 
         .toolbar {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             padding: 15px;
             background: rgba(0,0,0,0.1);
+            align-items: center;
         }
 
         button {
-            background: var(--button-color);
+            background: var(--primary-color);
             border: none;
             color: var(--text-color);
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: var(--button-radius);
             cursor: pointer;
-            transition: 0.2s;
+            transition: filter 0.2s;
+            min-width: 40px;
         }
 
         button:hover {
-            filter: brightness(1.1);
+            filter: brightness(1.15);
         }
 
         input[type="text"] {
             flex: 1;
-            padding: 10px;
+            padding: 10px 15px;
             border: none;
-            border-radius: 8px;
+            border-radius: var(--button-radius);
             background: rgba(255,255,255,0.1);
             color: var(--text-color);
+            font-size: 16px;
         }
 
         iframe {
+            flex: 1;
             width: 100%;
-            height: calc(100vh - 60px);
             border: none;
             background: white;
         }
 
         .settings-panel {
             position: fixed;
-            right: -250px;
             top: 0;
-            width: 250px;
+            right: -300px;
+            width: 300px;
             height: 100%;
             background: var(--bg-color);
             padding: 20px;
-            transition: 0.3s;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            transition: right 0.3s;
+            box-shadow: -2px 0 15px rgba(0,0,0,0.2);
         }
 
         .settings-open {
             right: 0;
+        }
+
+        .color-picker {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .color-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-input label {
+            flex: 1;
+        }
+
+        #colorCustom {
+            width: 100%;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
@@ -78,57 +154,120 @@
         <button onclick="goBack()">←</button>
         <button onclick="goForward()">→</button>
         <button onclick="reloadPage()">↻</button>
-        <input type="text" id="url" placeholder="Введите URL">
-        <button onclick="loadUrl()">Перейти</button>
-        <button onclick="toggleSettings()">⚙️</button>
+        <input type="text" id="urlInput" placeholder="Search or enter address">
+        <button onclick="navigate()">Go</button>
+        <button onclick="toggleSettings()">⚙</button>
     </div>
 
-    <iframe id="browser" src="https://google.com"></iframe>
+    <iframe id="browserFrame" src="https://duckduckgo.com/"></iframe>
+    <div class="loader" id="loader"></div>
 
-    <div class="settings-panel" id="settings">
-        <h3>Настройки</h3>
-        
-        <label>Цвет фона:
-            <input type="color" id="bgColor" onchange="updateColor('bg-color', this.value)">
-        </label>
-
-        <label>Цвет кнопок:
-            <input type="color" id="btnColor" onchange="updateColor('button-color', this.value)">
-        </label>
-
-        <label>Цвет текста:
-            <input type="color" id="textColor" onchange="updateColor('text-color', this.value)">
-        </label>
-
-        <button onclick="resetColors()">Сбросить цвета</button>
+    <div class="settings-panel" id="settingsPanel">
+        <h3>Customization</h3>
+        <div class="color-picker">
+            <div class="color-input">
+                <label>Background Color:</label>
+                <input type="color" id="bgColor" onchange="updateColor('bg-color', this.value)">
+            </div>
+            <div class="color-input">
+                <label>Button Color:</label>
+                <input type="color" id="primaryColor" onchange="updateColor('primary-color', this.value)">
+            </div>
+            <div class="color-input">
+                <label>Text Color:</label>
+                <input type="color" id="textColor" onchange="updateColor('text-color', this.value)">
+            </div>
+        </div>
+        <button onclick="resetColors()">Reset Defaults</button>
     </div>
 
     <script>
-        // Работа с браузером
-        const browser = document.getElementById('browser');
-        const urlInput = document.getElementById('url');
+        let currentHistoryIndex = -1;
+        let history = [];
+        let isLoading = false;
 
-        function loadUrl() {
-            let url = urlInput.value;
-            if (!url.startsWith('http')) {
-                url = 'https://' + url;
+        function init() {
+            loadSettings();
+            setupEventListeners();
+            updateFrame('https://duckduckgo.com/');
+        }
+
+        function updateFrame(url) {
+            const frame = document.getElementById('browserFrame');
+            const loader = document.getElementById('loader');
+            
+            isLoading = true;
+            loader.style.display = 'block';
+            
+            frame.onload = frame.onerror = () => {
+                isLoading = false;
+                loader.style.display = 'none';
+            };
+            
+            try {
+                frame.src = url;
+                addToHistory(url);
+                document.getElementById('urlInput').value = url;
+            } catch (error) {
+                showError('Error loading page');
             }
-            browser.src = url;
+        }
+
+        function navigate() {
+            const input = document.getElementById('urlInput').value.trim();
+            
+            if (!input) return;
+            
+            if (isValidUrl(input)) {
+                updateFrame(input);
+            } else {
+                performSearch(input);
+            }
+        }
+
+        function performSearch(query) {
+            const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+            updateFrame(searchUrl);
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
         }
 
         function goBack() {
-            browser.contentWindow.history.back();
+            if (currentHistoryIndex > 0) {
+                currentHistoryIndex--;
+                updateFrame(history[currentHistoryIndex], true);
+            }
         }
 
         function goForward() {
-            browser.contentWindow.history.forward();
+            if (currentHistoryIndex < history.length - 1) {
+                currentHistoryIndex++;
+                updateFrame(history[currentHistoryIndex], true);
+            }
         }
 
         function reloadPage() {
-            browser.contentWindow.location.reload();
+            if (!isLoading) {
+                const frame = document.getElementById('browserFrame');
+                frame.contentWindow.location.reload();
+            }
         }
 
-        // Настройки цветов
+        function addToHistory(url) {
+            if (history[currentHistoryIndex] !== url) {
+                history = history.slice(0, currentHistoryIndex + 1);
+                history.push(url);
+                currentHistoryIndex++;
+            }
+        }
+
         function updateColor(variable, value) {
             document.documentElement.style.setProperty(`--${variable}`, value);
             saveSettings();
@@ -136,12 +275,9 @@
 
         function saveSettings() {
             const settings = {
-                bg: getComputedStyle(document.documentElement)
-                    .getPropertyValue('--bg-color').trim(),
-                btn: getComputedStyle(document.documentElement)
-                    .getPropertyValue('--button-color').trim(),
-                text: getComputedStyle(document.documentElement)
-                    .getPropertyValue('--text-color').trim()
+                bg: getComputedStyle(document.documentElement).getPropertyValue('--bg-color'),
+                primary: getComputedStyle(document.documentElement).getPropertyValue('--primary-color'),
+                text: getComputedStyle(document.documentElement).getPropertyValue('--text-color')
             };
             localStorage.setItem('browserSettings', JSON.stringify(settings));
         }
@@ -150,30 +286,33 @@
             const saved = JSON.parse(localStorage.getItem('browserSettings'));
             if (saved) {
                 updateColor('bg-color', saved.bg);
-                updateColor('button-color', saved.btn);
+                updateColor('primary-color', saved.primary);
                 updateColor('text-color', saved.text);
             }
         }
 
         function resetColors() {
             document.documentElement.style.removeProperty('--bg-color');
-            document.documentElement.style.removeProperty('--button-color');
+            document.documentElement.style.removeProperty('--primary-color');
             document.documentElement.style.removeProperty('--text-color');
             localStorage.removeItem('browserSettings');
         }
 
         function toggleSettings() {
-            document.getElementById('settings').classList.toggle('settings-open');
+            document.getElementById('settingsPanel').classList.toggle('settings-open');
         }
 
-        // Инициализация
-        window.onload = () => {
-            loadSettings();
-            browser.onload = () => urlInput.value = browser.src;
-            urlInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') loadUrl();
+        function setupEventListeners() {
+            document.getElementById('urlInput').addEventListener('keypress', e => {
+                if (e.key === 'Enter') navigate();
             });
-        };
+        }
+
+        function showError(message) {
+            alert(`Error: ${message}`);
+        }
+
+        window.onload = init;
     </script>
 </body>
 </html>
