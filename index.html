@@ -1,209 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+    <title>Simple Browser</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Browser</title>
     <style>
-        :root {
-            --bg-color: #1a1a1a;
-            --primary-color: #2aabee;
-            --text-color: #ffffff;
-            --button-radius: 8px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
         body {
-            background: var(--bg-color);
-            color: var(--text-color);
+            margin: 0;
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
-
         .toolbar {
+            padding: 10px;
+            background: #f0f0f0;
             display: flex;
             gap: 10px;
-            padding: 15px;
-            background: rgba(0,0,0,0.2);
-            align-items: center;
         }
-
-        button {
-            background: var(--primary-color);
-            border: none;
-            color: var(--text-color);
-            padding: 8px 16px;
-            border-radius: var(--button-radius);
-            cursor: pointer;
-            transition: filter 0.2s;
-        }
-
-        button:hover {
-            filter: brightness(1.1);
-        }
-
-        input[type="text"] {
-            flex: 1;
-            padding: 10px 15px;
-            border: none;
-            border-radius: var(--button-radius);
-            background: rgba(255,255,255,0.1);
-            color: var(--text-color);
-            font-size: 16px;
-        }
-
         iframe {
             flex: 1;
-            width: 100%;
             border: none;
-            background: white;
-        }
-
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: none;
-        }
-
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-
-        .error-message {
-            color: #ff4444;
-            padding: 10px;
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            border-radius: 5px;
-            display: none;
         }
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <button onclick="goBack()">←</button>
-        <button onclick="goForward()">→</button>
-        <button onclick="reloadPage()">↻</button>
-        <input type="text" id="urlInput" placeholder="Search or enter address">
-        <button onclick="navigate()">Go</button>
+        <input type="text" id="url" placeholder="https://example.com" style="flex:1; padding:5px;">
+        <button onclick="load()">Go</button>
     </div>
-
-    <div class="loader" id="loader"></div>
-    <div class="error-message" id="errorMsg"></div>
-    <iframe id="browserFrame" src="https://search.brave.com"></iframe>
+    <iframe id="content"></iframe>
 
     <script>
-        let history = [];
-        let currentIndex = -1;
-        let isLoading = false;
-
-        function showLoader() {
-            document.getElementById('loader').style.display = 'block';
-            isLoading = true;
-        }
-
-        function hideLoader() {
-            document.getElementById('loader').style.display = 'none';
-            isLoading = false;
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('errorMsg');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(() => errorDiv.style.display = 'none', 3000);
-        }
-
-        function normalizeUrl(url) {
-            try {
-                const urlObj = new URL(url);
-                if (!urlObj.protocol.startsWith('http')) {
-                    return `https://${url}`;
-                }
-                return url;
-            } catch {
-                return `https://search.brave.com/search?q=${encodeURIComponent(url)}`;
+        function load() {
+            let url = document.getElementById('url').value;
+            if (!url.startsWith('http')) {
+                url = 'https://' + url;
             }
+            document.getElementById('content').src = url;
         }
-
-        function navigate() {
-            const input = document.getElementById('urlInput').value.trim();
-            if (!input) return;
-
-            showLoader();
-            const normalizedUrl = normalizeUrl(input);
-            
-            const frame = document.getElementById('browserFrame');
-            frame.src = normalizedUrl;
-            
-            frame.onload = () => {
-                hideLoader();
-                if (history[currentIndex] !== normalizedUrl) {
-                    history = history.slice(0, currentIndex + 1);
-                    history.push(normalizedUrl);
-                    currentIndex++;
-                }
-            };
-
-            frame.onerror = () => {
-                hideLoader();
-                showError('Failed to load page');
-            };
-        }
-
-        function goBack() {
-            if (currentIndex > 0) {
-                currentIndex--;
-                loadHistoryUrl();
-            }
-        }
-
-        function goForward() {
-            if (currentIndex < history.length - 1) {
-                currentIndex++;
-                loadHistoryUrl();
-            }
-        }
-
-        function loadHistoryUrl() {
-            const frame = document.getElementById('browserFrame');
-            frame.src = history[currentIndex];
-            document.getElementById('urlInput').value = history[currentIndex];
-        }
-
-        function reloadPage() {
-            if (!isLoading) {
-                const frame = document.getElementById('browserFrame');
-                frame.contentWindow.location.reload();
-            }
-        }
-
-        // Обработчик ввода URL
-        document.getElementById('urlInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') navigate();
-        });
-
-        // Инициализация
-        navigate();
+        
+        // Initial load
+        load();
     </script>
 </body>
 </html>
