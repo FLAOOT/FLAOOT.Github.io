@@ -1,273 +1,211 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Browser with Tabs</title>
+    <title>Universal Browser</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            font-family: Arial, sans-serif;
-        }
+        /* ... предыдущие стили ... */
 
-        .tabs-container {
-            display: flex;
-            background: #e0e0e0;
-            padding: 5px 5px 0 5px;
-        }
-
-        .tab {
-            padding: 8px 20px;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-bottom: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            max-width: 200px;
-        }
-
-        .tab.active {
-            background: #f0f0f0;
-        }
-
-        .tab-close {
+        /* Новые элементы для медиа-поиска */
+        .search-type {
+            padding: 8px;
+            border-radius: var(--border-radius);
             margin-left: 10px;
-            color: #999;
-            border: none;
-            background: none;
-            cursor: pointer;
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--secondary-color);
         }
 
-        .controls {
+        .media-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            padding: 20px;
+        }
+
+        .media-item {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            background: var(--secondary-color);
+            transition: transform 0.2s ease;
+        }
+
+        .media-item:hover {
+            transform: translateY(-3px);
+        }
+
+        .media-thumbnail {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        .media-info {
             padding: 10px;
-            background: #f0f0f0;
-            display: flex;
-            gap: 5px;
         }
 
-        .url-bar {
-            flex-grow: 1;
-            padding: 5px;
-        }
-
-        iframe {
-            border: none;
-            flex-grow: 1;
-            display: none;
-        }
-
-        iframe.active {
-            display: block;
-        }
-
-        button {
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-
-        .bookmarks-panel {
+        .language-selector {
             position: fixed;
-            right: 0;
-            top: 0;
-            bottom: 0;
-            width: 250px;
-            background: white;
-            border-left: 1px solid #ccc;
-            padding: 10px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .bookmark-item {
-            padding: 5px;
-            cursor: pointer;
-            word-break: break-all;
-        }
-
-        .bookmark-item:hover {
-            background: #f0f0f0;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px;
+            border-radius: var(--border-radius);
+            background: var(--primary-color);
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="tabs-container" id="tabsContainer"></div>
+    <!-- Добавляем селектор языка -->
+    <select class="language-selector" id="languageSelector" onchange="changeLanguage(this.value)">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="ru">Русский</option>
+    </select>
+
+    <!-- Модифицированная панель управления -->
     <div class="controls">
-        <button onclick="addTab()">+</button>
-        <button onclick="goBack()">←</button>
-        <button onclick="goForward()">→</button>
-        <button onclick="refreshPage()">↻</button>
-        <input type="text" class="url-bar" id="url" placeholder="Enter URL">
-        <button onclick="go()">Go</button>
-        <button onclick="toggleBookmarks()">★</button>
-        <button onclick="addBookmark()">Add Bookmark</button>
+        <!-- ... другие элементы ... -->
+        <select class="search-type" id="searchType">
+            <option value="web">Web</option>
+            <option value="images">Images</option>
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+        </select>
     </div>
-    <div class="bookmarks-panel" id="bookmarksPanel">
-        <h3>Bookmarks</h3>
-        <div id="bookmarksList"></div>
-    </div>
+
+    <!-- Контейнер для результатов -->
+    <div class="media-results" id="resultsContainer"></div>
 
     <script>
-        let tabs = [];
-        let currentTabId = null;
-        let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
+        // Локализации
+        const translations = {
+            en: {
+                searchPlaceholder: "Search or enter address",
+                web: "Web",
+                images: "Images",
+                video: "Video",
+                audio: "Audio",
+                // ... другие переводы
+            },
+            es: {
+                searchPlaceholder: "Buscar o ingresar URL",
+                web: "Web",
+                images: "Imágenes",
+                video: "Video",
+                audio: "Audio",
+                // ...
+            },
+            // ... другие языки
+        };
 
-        function Tab(id) {
-            this.id = id;
-            this.url = 'https://example.com';
-            this.iframe = document.createElement('iframe');
-            this.iframe.classList.add('browser-frame');
-            document.body.appendChild(this.iframe);
-            this.title = 'New Tab';
+        let currentLanguage = 'en';
+
+        function changeLanguage(lang) {
+            currentLanguage = lang;
+            applyTranslations();
+            localStorage.setItem('language', lang);
         }
 
-        function addTab(url) {
-            const id = Date.now();
-            const tab = new Tab(id);
-            
-            if(url) tab.url = url;
-            
-            tabs.push(tab);
-            renderTabs();
-            switchTab(id);
-            updateUrlBar();
+        function applyTranslations() {
+            document.getElementById('searchInput').placeholder = 
+                translations[currentLanguage].searchPlaceholder;
+            document.querySelectorAll('#searchType option').forEach((opt, index) => {
+                opt.textContent = translations[currentLanguage][Object.keys(translations.en).filter(k => k !== 'searchPlaceholder')[index]];
+            });
+            // Обновить другие элементы интерфейса
         }
 
-        function renderTabs() {
-            const container = document.getElementById('tabsContainer');
+        // Медиа-поиск
+        async function searchContent(query, type) {
+            const API_KEYS = {
+                GOOGLE: 'YOUR_GOOGLE_API_KEY',
+                YOUTUBE: 'YOUR_YOUTUBE_API_KEY',
+                PIXABAY: 'YOUR_PIXABAY_API_KEY'
+            };
+
+            let endpoint;
+            switch(type) {
+                case 'images':
+                    endpoint = `https://pixabay.com/api/?key=${API_KEYS.PIXABAY}&q=${query}&image_type=photo`;
+                    break;
+                case 'video':
+                    endpoint = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&key=${API_KEYS.YOUTUBE}`;
+                    break;
+                case 'audio':
+                    endpoint = `https://api.spotify.com/v1/search?q=${query}&type=track`;
+                    break;
+                default:
+                    return performWebSearch(query);
+            }
+
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                displayResults(data, type);
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        function displayResults(data, type) {
+            const container = document.getElementById('resultsContainer');
             container.innerHTML = '';
 
-            tabs.forEach(tab => {
-                const tabElement = document.createElement('div');
-                tabElement.className = `tab ${tab.id === currentTabId ? 'active' : ''}`;
-                tabElement.innerHTML = `
-                    <span>${tab.title}</span>
-                    <button class="tab-close" onclick="closeTab(${tab.id})">×</button>
-                `;
-                tabElement.addEventListener('click', () => switchTab(tab.id));
-                container.appendChild(tabElement);
-            });
-        }
-
-        function switchTab(id) {
-            tabs.forEach(tab => {
-                tab.iframe.style.display = 'none';
-                if(tab.id === id) {
-                    tab.iframe.style.display = 'block';
-                    currentTabId = id;
-                    updateUrlBar();
-                }
-            });
-            renderTabs();
-        }
-
-        function closeTab(id) {
-            if(tabs.length === 1) {
-                addTab();
+            switch(type) {
+                case 'images':
+                    data.hits.forEach(img => {
+                        container.innerHTML += `
+                            <div class="media-item">
+                                <img src="${img.webformatURL}" class="media-thumbnail">
+                                <div class="media-info">${img.tags}</div>
+                            </div>
+                        `;
+                    });
+                    break;
+                case 'video':
+                    data.items.forEach(video => {
+                        container.innerHTML += `
+                            <div class="media-item">
+                                <iframe src="https://youtube.com/embed/${video.id.videoId}" 
+                                    frameborder="0" allowfullscreen></iframe>
+                            </div>
+                        `;
+                    });
+                    break;
+                case 'audio':
+                    data.tracks.items.forEach(track => {
+                        container.innerHTML += `
+                            <div class="media-item">
+                                <audio controls src="${track.preview_url}"></audio>
+                                <div class="media-info">${track.name}</div>
+                            </div>
+                        `;
+                    });
+                    break;
             }
-            
-            const index = tabs.findIndex(tab => tab.id === id);
-            const tab = tabs[index];
-            tab.iframe.remove();
-            tabs.splice(index, 1);
-            
-            if(id === currentTabId) {
-                switchTab(tabs[0].id);
-            }
-        }
-
-        function updateUrlBar() {
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            if(currentTab) {
-                document.getElementById('url').value = currentTab.url;
-            }
-        }
-
-        function go() {
-            const url = document.getElementById('url').value;
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            
-            if (!url.startsWith('http')) {
-                currentTab.url = 'https://' + url;
-            } else {
-                currentTab.url = url;
-            }
-            
-            currentTab.iframe.src = currentTab.url;
-            updateUrlBar();
-        }
-
-        // Закладки
-        function toggleBookmarks() {
-            const panel = document.getElementById('bookmarksPanel');
-            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-        }
-
-        function addBookmark() {
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            if(currentTab && !bookmarks.includes(currentTab.url)) {
-                bookmarks.push(currentTab.url);
-                localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
-                renderBookmarks();
-            }
-        }
-
-        function renderBookmarks() {
-            const list = document.getElementById('bookmarksList');
-            list.innerHTML = '';
-            
-            bookmarks.forEach(bookmark => {
-                const item = document.createElement('div');
-                item.className = 'bookmark-item';
-                item.textContent = bookmark;
-                item.addEventListener('click', () => {
-                    const currentTab = tabs.find(tab => tab.id === currentTabId);
-                    currentTab.url = bookmark;
-                    currentTab.iframe.src = bookmark;
-                    updateUrlBar();
-                });
-                list.appendChild(item);
-            });
-        }
-
-        // Навигация
-        function goBack() {
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            currentTab.iframe.contentWindow.history.back();
-        }
-
-        function goForward() {
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            currentTab.iframe.contentWindow.history.forward();
-        }
-
-        function refreshPage() {
-            const currentTab = tabs.find(tab => tab.id === currentTabId);
-            currentTab.iframe.contentWindow.location.reload();
         }
 
         // Инициализация
-        document.getElementById('url').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') go();
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('language') || 'en';
+            changeLanguage(savedLang);
+            document.getElementById('languageSelector').value = savedLang;
         });
 
-        // Обновление заголовка вкладки
-        document.addEventListener('DOMContentLoaded', () => {
-            addTab();
-            renderBookmarks();
+        // Модифицированная функция поиска
+        function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            const type = document.getElementById('searchType').value;
             
-            tabs.forEach(tab => {
-                tab.iframe.addEventListener('load', () => {
-                    tab.url = tab.iframe.contentWindow.location.href;
-                    tab.title = tab.iframe.contentDocument.title || tab.url;
-                    updateUrlBar();
-                    renderTabs();
-                });
-            });
-        });
+            if(type === 'web') {
+                navigateToUrl(query);
+            } else {
+                searchContent(query, type);
+            }
+        }
     </script>
 </body>
 </html>
