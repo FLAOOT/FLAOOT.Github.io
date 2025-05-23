@@ -2,64 +2,272 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Навигация по каналу!</title>
+    <title>Browser with Tabs</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #1e1e1e;
-            color: white;
             margin: 0;
-            padding: 10px;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
         }
-        .category {
-            margin-bottom: 15px;
+
+        .tabs-container {
+            display: flex;
+            background: #e0e0e0;
+            padding: 5px 5px 0 5px;
         }
-        .category-title {
-            font-weight: bold;
-            color: #888;
-            padding: 5px 0;
+
+        .tab {
+            padding: 8px 20px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            max-width: 200px;
         }
-        .channel-btn {
-            background: #333;
+
+        .tab.active {
+            background: #f0f0f0;
+        }
+
+        .tab-close {
+            margin-left: 10px;
+            color: #999;
             border: none;
-            color: white;
-            padding: 10px;
-            margin: 5px 0;
-            width: 100%;
-            text-align: left;
-            border-radius: 5px;
+            background: none;
             cursor: pointer;
         }
-        .channel-btn:hover {
-            background: #444;
+
+        .controls {
+            padding: 10px;
+            background: #f0f0f0;
+            display: flex;
+            gap: 5px;
+        }
+
+        .url-bar {
+            flex-grow: 1;
+            padding: 5px;
+        }
+
+        iframe {
+            border: none;
+            flex-grow: 1;
+            display: none;
+        }
+
+        iframe.active {
+            display: block;
+        }
+
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .bookmarks-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 250px;
+            background: white;
+            border-left: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .bookmark-item {
+            padding: 5px;
+            cursor: pointer;
+            word-break: break-all;
+        }
+
+        .bookmark-item:hover {
+            background: #f0f0f0;
         }
     </style>
 </head>
 <body>
-    <div class="category">
-        <div class="category-title">📢 Основные чаты</div>
-        <button class="channel-btn" onclick="openLink('https://t.me/+TZjCwj6CCLUxZDI6')">🤪Общий чат</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+6eXrvo_Y6BQ4NDUy')">🔨Постройки</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+H7S8V3-tGFJmYTQy')">👽Существа</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+46mVspW_a3Y3NGFi')">🛩️Техника</button>
+    <div class="tabs-container" id="tabsContainer"></div>
+    <div class="controls">
+        <button onclick="addTab()">+</button>
+        <button onclick="goBack()">←</button>
+        <button onclick="goForward()">→</button>
+        <button onclick="refreshPage()">↻</button>
+        <input type="text" class="url-bar" id="url" placeholder="Enter URL">
+        <button onclick="go()">Go</button>
+        <button onclick="toggleBookmarks()">★</button>
+        <button onclick="addBookmark()">Add Bookmark</button>
     </div>
-    </div>
-  
-    <div class="category">
-        <div class="category-title">📰 Основные Каналы</div>
-        <button class="channel-btn" onclick="openLink('https://t.me/+KKNTWdvZbhNiM2Ni')">🤪Лучшие чатеры</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+nJjmNtEDESIxZTgy')">🔨Лучшие Постройки</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+vt5eJZdesOFhNWRi')">🎉Лучшие Существа</button>
-        <button class="channel-btn" onclick="openLink('https://t.me/+vI3gwOFM28kwYTZi')">🛩️Лучшая Техника</button>
-    </div>
+    <div class="bookmarks-panel" id="bookmarksPanel">
+        <h3>Bookmarks</h3>
+        <div id="bookmarksList"></div>
     </div>
 
-    <!-- Добавленный скрипт -->
     <script>
-    function openLink(url) {
-        window.open(url, '_blank'); // Открывает ссылку в новой вкладке
-    }
+        let tabs = [];
+        let currentTabId = null;
+        let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
+
+        function Tab(id) {
+            this.id = id;
+            this.url = 'https://example.com';
+            this.iframe = document.createElement('iframe');
+            this.iframe.classList.add('browser-frame');
+            document.body.appendChild(this.iframe);
+            this.title = 'New Tab';
+        }
+
+        function addTab(url) {
+            const id = Date.now();
+            const tab = new Tab(id);
+            
+            if(url) tab.url = url;
+            
+            tabs.push(tab);
+            renderTabs();
+            switchTab(id);
+            updateUrlBar();
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            container.innerHTML = '';
+
+            tabs.forEach(tab => {
+                const tabElement = document.createElement('div');
+                tabElement.className = `tab ${tab.id === currentTabId ? 'active' : ''}`;
+                tabElement.innerHTML = `
+                    <span>${tab.title}</span>
+                    <button class="tab-close" onclick="closeTab(${tab.id})">×</button>
+                `;
+                tabElement.addEventListener('click', () => switchTab(tab.id));
+                container.appendChild(tabElement);
+            });
+        }
+
+        function switchTab(id) {
+            tabs.forEach(tab => {
+                tab.iframe.style.display = 'none';
+                if(tab.id === id) {
+                    tab.iframe.style.display = 'block';
+                    currentTabId = id;
+                    updateUrlBar();
+                }
+            });
+            renderTabs();
+        }
+
+        function closeTab(id) {
+            if(tabs.length === 1) {
+                addTab();
+            }
+            
+            const index = tabs.findIndex(tab => tab.id === id);
+            const tab = tabs[index];
+            tab.iframe.remove();
+            tabs.splice(index, 1);
+            
+            if(id === currentTabId) {
+                switchTab(tabs[0].id);
+            }
+        }
+
+        function updateUrlBar() {
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            if(currentTab) {
+                document.getElementById('url').value = currentTab.url;
+            }
+        }
+
+        function go() {
+            const url = document.getElementById('url').value;
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            
+            if (!url.startsWith('http')) {
+                currentTab.url = 'https://' + url;
+            } else {
+                currentTab.url = url;
+            }
+            
+            currentTab.iframe.src = currentTab.url;
+            updateUrlBar();
+        }
+
+        // Закладки
+        function toggleBookmarks() {
+            const panel = document.getElementById('bookmarksPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addBookmark() {
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            if(currentTab && !bookmarks.includes(currentTab.url)) {
+                bookmarks.push(currentTab.url);
+                localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+                renderBookmarks();
+            }
+        }
+
+        function renderBookmarks() {
+            const list = document.getElementById('bookmarksList');
+            list.innerHTML = '';
+            
+            bookmarks.forEach(bookmark => {
+                const item = document.createElement('div');
+                item.className = 'bookmark-item';
+                item.textContent = bookmark;
+                item.addEventListener('click', () => {
+                    const currentTab = tabs.find(tab => tab.id === currentTabId);
+                    currentTab.url = bookmark;
+                    currentTab.iframe.src = bookmark;
+                    updateUrlBar();
+                });
+                list.appendChild(item);
+            });
+        }
+
+        // Навигация
+        function goBack() {
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            currentTab.iframe.contentWindow.history.back();
+        }
+
+        function goForward() {
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            currentTab.iframe.contentWindow.history.forward();
+        }
+
+        function refreshPage() {
+            const currentTab = tabs.find(tab => tab.id === currentTabId);
+            currentTab.iframe.contentWindow.location.reload();
+        }
+
+        // Инициализация
+        document.getElementById('url').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') go();
+        });
+
+        // Обновление заголовка вкладки
+        document.addEventListener('DOMContentLoaded', () => {
+            addTab();
+            renderBookmarks();
+            
+            tabs.forEach(tab => {
+                tab.iframe.addEventListener('load', () => {
+                    tab.url = tab.iframe.contentWindow.location.href;
+                    tab.title = tab.iframe.contentDocument.title || tab.url;
+                    updateUrlBar();
+                    renderTabs();
+                });
+            });
+        });
     </script>
 </body>
 </html>
