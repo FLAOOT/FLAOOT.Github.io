@@ -1,152 +1,94 @@
 <!DOCTYPE html>
-<html lang="mul">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Browser</title>
+    <title>Secure Browser</title>
     <style>
-        /* Все предыдущие стили остаются без изменений */
-        .error-message {
-            color: #ff4444;
+        /* Все предыдущие стили остаются */
+        .proxy-warning {
+            background: #ffeb3b;
+            color: #000;
             padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
             display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Добавляем сообщение об ошибках -->
-    <div class="error-message" id="errorMessage"></div>
+    <div class="proxy-warning" id="proxyWarning">
+        Используется безопасный прокси-доступ. Некоторые функции могут быть ограничены.
+    </div>
 
     <!-- Остальная разметка без изменений -->
 
     <script>
-        // Обновленные функции навигации
-        let currentFrame = null;
+        const PROXY_URL = 'https://cors-anywhere.herokuapp.com/';
+        let useProxy = false;
 
-        function createNewTab() {
-            const tabId = Date.now();
-            tabs[tabId] = {
-                history: [],
-                currentPosition: -1,
-                url: 'about:blank'
-            };
-            currentTab = tabId;
-            updateTabsUI();
-            loadFrameContent(tabId);
-        }
-
-        function loadFrameContent(tabId) {
-            const frame = document.createElement('iframe');
-            frame.id = `frame_${tabId}`;
-            frame.style.display = 'none';
-            frame.sandbox = "allow-same-origin allow-scripts allow-forms allow-popups allow-modals";
-            frame.referrerpolicy = "no-referrer-when-downgrade";
-            document.body.appendChild(frame);
-            
-            frame.onload = () => {
-                document.getElementById('errorMessage').style.display = 'none';
-                frame.style.display = 'block';
-                updateUrlInput(tabs[tabId].url);
-            };
-            
-            frame.onerror = () => {
-                showError('Failed to load page');
-                frame.style.display = 'none';
-            };
-        }
-
-        function navigate() {
+        async function navigate() {
             const urlInput = document.getElementById('urlInput');
             let url = urlInput.value.trim();
             
             if (!url) return;
-            
-            if (!isValidUrl(url)) {
-                url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
-            } else if (!url.startsWith('http')) {
-                url = `https://${url}`;
+
+            // Автоматическое определение необходимости прокси
+            if (url.includes('google.com') || url.includes('youtube.com')) {
+                useProxy = true;
+                document.getElementById('proxyWarning').style.display = 'block';
             }
 
-            const frame = document.getElementById(`frame_${currentTab}`);
-            frame.src = url;
-            tabs[currentTab].url = url;
-            addToHistory(url);
-        }
-
-        function goBack() {
-            const frame = document.getElementById(`frame_${currentTab}`);
             try {
-                frame.contentWindow.history.back();
+                const finalUrl = useProxy ? PROXY_URL + url : url;
+                const frame = document.getElementById(`frame_${currentTab}`);
+                
+                // Проверка безопасности URL
+                if (!isValidUrl(finalUrl)) {
+                    throw new Error('Недопустимый URL');
+                }
+
+                frame.src = finalUrl;
+                tabs[currentTab].url = finalUrl;
+                addToHistory(finalUrl);
             } catch (error) {
-                showError('Cannot go back');
+                showError(error.message);
             }
         }
 
-        function goForward() {
-            const frame = document.getElementById(`frame_${currentTab}`);
-            try {
-                frame.contentWindow.history.forward();
-            } catch (error) {
-                showError('Cannot go forward');
-            }
-        }
-
-        function reloadPage() {
-            const frame = document.getElementById(`frame_${currentTab}`);
-            try {
-                frame.contentWindow.location.reload();
-            } catch (error) {
-                showError('Reload failed');
-            }
-        }
-
-        function showError(message) {
-            const errorElement = document.getElementById('errorMessage');
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
-            setTimeout(() => errorElement.style.display = 'none', 3000);
-        }
-
-        // Обновленная функция поиска
         function search(type) {
             const query = document.getElementById('urlInput').value.trim();
-            if (!query) return;
+            const engine = useProxy ? 'https://duckduckgo.com/' : 'https://google.com/';
             
-            const searchUrls = {
-                images: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`,
-                videos: `https://www.google.com/search?tbm=vid&q=${encodeURIComponent(query)}`,
-                music: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-                news: `https://news.google.com/search?q=${encodeURIComponent(query)}`
+            const searchPaths = {
+                images: 'iax=images&ia=images',
+                videos: 'iax=videos&ia=videos',
+                music: 'iax=music&ia=music',
+                news: 'iar=news&ia=news'
             };
             
-            const frame = document.getElementById(`frame_${currentTab}`);
-            frame.src = searchUrls[type] || searchUrls.web;
+            const searchUrl = `${engine}?q=${encodeURIComponent(query)}&${searchPaths[type] || ''}`;
+            navigateToUrl(searchUrl);
         }
 
-        // Инициализация с первой вкладкой
-        function init() {
-            // ... предыдущий код инициализации ...
-            createNewTab();
-            document.getElementById(`frame_${currentTab}`).style.display = 'block';
-        }
-
-        // Обновление URL в input при навигации
-        function updateUrlInput(url) {
-            document.getElementById('urlInput').value = url;
-        }
-
-        // Обработчик изменения URL во фрейме
-        setInterval(() => {
+        function navigateToUrl(url) {
             const frame = document.getElementById(`frame_${currentTab}`);
             try {
-                if (frame.contentWindow.location.href !== tabs[currentTab].url) {
-                    tabs[currentTab].url = frame.contentWindow.location.href;
-                    updateUrlInput(tabs[currentTab].url);
-                }
+                frame.src = useProxy ? PROXY_URL + url : url;
+                tabs[currentTab].url = url;
+                addToHistory(url);
             } catch (error) {
-                // Блокировка CORS
+                showError('Ошибка загрузки страницы');
             }
-        }, 500);
+        }
+
+        // Обновленная проверка URL
+        function isValidUrl(string) {
+            try {
+                const url = new URL(string);
+                return ['http:', 'https:'].includes(url.protocol);
+            } catch (_) {
+                return false;
+            }
+        }
     </script>
 </body>
 </html>
