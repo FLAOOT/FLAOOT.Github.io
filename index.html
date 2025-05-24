@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TeleCraft</title>
+    <title>T</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -216,7 +216,7 @@
             constructor() {
                 this.height = 1.8;
                 this.radius = 0.3;
-                this.position = new THREE.Vector3(0, 20, 0);
+                this.position = new THREE.Vector3(0, 15, 0);
                 this.flySpeed = 8;
             }
         }
@@ -253,7 +253,6 @@
             document.addEventListener('contextmenu', e => e.preventDefault());
             window.addEventListener('resize', onWindowResize);
 
-            // Настройка цветовых пикеров
             document.getElementById('ui-color').addEventListener('input', (e) => {
                 document.documentElement.style.setProperty('--ui-color', e.target.value);
             });
@@ -290,7 +289,6 @@
             document.documentElement.style.setProperty('--bg-color', savedColors.bg || '#2a2a2a');
             document.documentElement.style.setProperty('--border-color', savedColors.border || '#3e3e3e');
             
-            // Обновление значений в пикерах
             document.getElementById('ui-color').value = savedColors.ui || '#2ea6ff';
             document.getElementById('bg-color').value = savedColors.bg || '#2a2a2a';
             document.getElementById('border-color').value = savedColors.border || '#3e3e3e';
@@ -392,29 +390,21 @@
             if(isFlying) {
                 velocity.set(0, 0, 0);
                 canJump = true;
-            } else {
-                velocity.y -= 9.8 * delta;
-            }
 
-            const direction = new THREE.Vector3();
-            if(keys['w']) direction.z -= 1;
-            if(keys['s']) direction.z += 1;
-            if(keys['a']) direction.x -= 1;
-            if(keys['d']) direction.x += 1;
-
-            direction.normalize();
-            direction.applyEuler(new THREE.Euler(0, yaw, 0));
-            
-            if(isFlying) {
+                const direction = new THREE.Vector3();
+                if(keys['w']) direction.z -= 1;
+                if(keys['s']) direction.z += 1;
+                if(keys['a']) direction.x -= 1;
+                if(keys['d']) direction.x += 1;
                 if(keys[' ']) direction.y += 1;
                 if(keys.shift) direction.y -= 1;
+
+                direction.normalize();
+                direction.applyEuler(new THREE.Euler(0, yaw, 0));
+                
+                player.position.add(direction.multiplyScalar(moveSpeed * delta));
             }
 
-            const moveVector = direction.multiplyScalar(moveSpeed * delta);
-            const newPos = player.position.clone().add(moveVector).add(velocity.multiplyScalar(delta));
-            const finalPos = checkCollisions(newPos);
-
-            player.position.copy(finalPos);
             player.position.x = THREE.MathUtils.clamp(player.position.x, -worldSize, worldSize);
             player.position.y = THREE.MathUtils.clamp(player.position.y, -64, 256);
             player.position.z = THREE.MathUtils.clamp(player.position.z, -worldSize, worldSize);
@@ -448,21 +438,20 @@
         }
 
         function createGround() {
-            // Стартовая платформа 5x5
-            for(let x = -2; x <= 2; x++) {
-                for(let z = -2; z <= 2; z++) {
-                    addBlock(x, -1, z, 'stone');
+            const platformSize = 7;
+            for(let x = -platformSize; x <= platformSize; x++) {
+                for(let z = -platformSize; z <= platformSize; z++) {
+                    addBlock(x, 10, z, 'stone');
+                    for(let y = 9; y >= 5; y--) {
+                        addBlock(x, y, z, 'stone');
+                    }
                 }
             }
-            
-            // Основной ландшафт
+
             for(let x = -worldSize; x <= worldSize; x++) {
                 for(let z = -worldSize; z <= worldSize; z++) {
-                    if(!blocks.has(`${x},0,${z}`)) {
-                        addBlock(x, 0, z, 'grass');
-                    }
-                    for(let y = -1; y >= -3; y--) {
-                        addBlock(x, y, z, 'dirt');
+                    for(let y = 4; y >= -3; y--) {
+                        addBlock(x, y, z, y >= 0 ? 'grass' : 'dirt');
                     }
                 }
             }
@@ -559,7 +548,8 @@
 
             renderer.render(scene, camera);
         }
+
         init();
-</script>
+    </script>
 </body>
 </html>
