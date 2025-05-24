@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TeleCraft</title>
+    <title>TlCrust</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -133,7 +133,7 @@
         let canJump = false;
         let isFlying = true;
         let worldSize = 50;
-        const visibleBlocks = new Set();
+        let saveTimeout;
 
         const blockMaterials = {
             grass: new THREE.MeshPhongMaterial({ color: 0x50C878 }),
@@ -223,8 +223,11 @@
             blockTypes.forEach((type, i) => {
                 const slot = document.createElement('div');
                 slot.className = 'slot';
+                const color = blockMaterials[type].transparent 
+                    ? blockMaterials[type].color.getStyle() 
+                    : `#${blockMaterials[type].color.getHexString()}`;
                 slot.innerHTML = `
-                    <div class="block-preview" style="background: #${blockMaterials[type].color.getHexString()}"></div>
+                    <div class="block-preview" style="background: ${color}"></div>
                     <div style="position: absolute; bottom: 2px; right: 4px; color: white; font-size: 12px">${i + 1}</div>
                 `;
                 slot.dataset.type = type;
@@ -258,9 +261,10 @@
             let collided = false;
             blocks.forEach(block => {
                 const blockBox = new THREE.Box3().setFromObject(block);
-                if(playerBox.intersectsBox(blockBox)) {
+                const intersection = playerBox.intersect(blockBox);
+                if(!intersection.isEmpty()) {
                     collided = true;
-                    const overlap = playerBox.intersect(blockBox).getSize(new THREE.Vector3());
+                    const overlap = intersection.getSize(new THREE.Vector3());
                     
                     if(overlap.y > overlap.x && overlap.y > overlap.z) {
                         velocity.y = 0;
@@ -278,6 +282,11 @@
                 }
             });
             return collided ? newPos : newPos;
+        }
+
+        function scheduleSave() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveWorld, 1000);
         }
 
         function updatePlayer(delta) {
@@ -307,10 +316,9 @@
             const finalPos = checkCollisions(newPos);
 
             player.position.copy(finalPos);
-            player.position.clamp(
-                new THREE.Vector3(-worldSize, -64, -worldSize),
-                new THREE.Vector3(worldSize, 256, worldSize)
-            );
+            player.position.x = THREE.MathUtils.clamp(player.position.x, -worldSize, worldSize);
+            player.position.y = THREE.MathUtils.clamp(player.position.y, -64, 256);
+            player.position.z = THREE.MathUtils.clamp(player.position.z, -worldSize, worldSize);
 
             camera.position.copy(player.position.add(new THREE.Vector3(0, player.height/2, 0)));
         }
@@ -361,7 +369,7 @@
             cube.userData.type = type;
             scene.add(cube);
             blocks.set(key, cube);
-            saveWorld();
+            scheduleSave();
         }
 
         function removeBlock(x, y, z) {
@@ -369,7 +377,7 @@
             if(blocks.has(key)) {
                 scene.remove(blocks.get(key));
                 blocks.delete(key);
-                saveWorld();
+                scheduleSave();
             }
         }
 
@@ -407,7 +415,10 @@
             );
             
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children);
+            const intersectable = Array.from(blocks.values()).filter(b => 
+                b.position.distanceTo(player.position) < 10
+            );
+            const intersects = raycaster.intersectObjects(intersectable);
             
             if(intersects.length > 0) {
                 const intersect = intersects[0];
