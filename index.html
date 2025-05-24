@@ -3,70 +3,98 @@
 <head>
     <title>Web Minecraft</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #inventory {
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #hud {
             position: fixed;
             bottom: 20px;
             width: 100%;
             display: flex;
             justify-content: center;
+            gap: 10px;
             z-index: 100;
         }
         .slot {
             width: 64px;
             height: 64px;
-            border: 2px solid white;
-            margin: 5px;
-            cursor: pointer;
+            border: 2px solid #555;
+            background: rgba(0,0,0,0.7);
             background-size: cover;
-        }
-        .active {
-            border-color: yellow;
-        }
-        #blockPointer {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 4px;
-            height: 4px;
-            background: white;
-            transform: translate(-50%, -50%);
-        }
-        #startButton {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 15px 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
             font-size: 20px;
-            cursor: pointer;
+        }
+        .active { border-color: gold; }
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            pointer-events: none;
+        }
+        #crafting {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="inventory"></div>
-    <div id="blockPointer"></div>
-    <button id="startButton">Start Game</button>
+    <div id="hud"></div>
+    <div id="crosshair">+</div>
+    <div id="crafting">
+        <h3 style="color:white;">Crafting</h3>
+        <div style="display: grid; grid-template-columns: repeat(2, 64px); gap: 5px;">
+            <div class="craft-slot" data-index="0"></div>
+            <div class="craft-slot" data-index="1"></div>
+            <div class="craft-slot" data-index="2"></div>
+            <div class="craft-slot" data-index="3"></div>
+        </div>
+        <div style="margin-top: 10px;">→</div>
+        <div class="result-slot"></div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
     <script>
         let scene, camera, renderer, controls;
         let blocks = new Map();
+        let inventory = Array(9).fill(null);
+        let craftingSlots = Array(4).fill(null);
         let currentBlockType = 'grass';
         const BLOCK_SIZE = 1;
         const MOVEMENT_SPEED = 0.1;
         const MOUSE_SENSITIVITY = 0.002;
         let moveState = { forward: false, backward: false, left: false, right: false };
-        
-        // Текстуры
-        const textures = {
-            grass: 'https://i.imgur.com/6YbD6qQ.png',
-            dirt: 'https://i.imgur.com/7Q6MZe1.png',
-            stone: 'https://i.imgur.com/3RXjJ6z.png',
-            wood: 'https://i.imgur.com/4n1BfT5.png'
+
+        // Текстуры и материалы
+        const materials = {
+            grass: loadMaterial('https://i.ibb.co/7Q6MZe1/grass.png'),
+            dirt: loadMaterial('https://i.ibb.co/7Q6MZe1/dirt.png'),
+            stone: loadMaterial('https://i.ibb.co/3RXjJ6z/stone.png'),
+            wood: loadMaterial('https://i.ibb.co/4n1BfT5/wood.png'),
+            plank: loadMaterial('https://i.ibb.co/0j7Z4q8/plank.png')
         };
 
-        // Инициализация
+        // Рецепты крафта
+        const recipes = [
+            {
+                input: ['wood', 'wood', null, 'wood'],
+                output: { type: 'plank', count: 4 }
+            }
+        ];
+
+        function loadMaterial(url) {
+            const texture = new THREE.TextureLoader().load(url);
+            return new THREE.MeshStandardMaterial({ map: texture });
+        }
+
         async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -80,41 +108,26 @@
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
-            // Загрузка текстур
-            const textureLoader = new THREE.TextureLoader();
-            for(let type in textures) {
-                textures[type] = await new Promise(resolve => 
-                    textureLoader.load(textures[type], resolve)
-                );
-            }
-
-            // Загрузка мира
-            loadWorld();
+            // Генерация мира
+            generateWorld();
+            loadSave();
 
             // Управление
             setupControls();
-            setupInventory();
+            updateInventory();
             animate();
         }
 
-        function setupControls() {
-            // Pointer Lock
-            controls = new THREE.PointerLockControls(camera, document.body);
-            scene.add(controls.getObject());
-            camera.position.y = 2;
-
-            // Обработчики событий
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('resize', onWindowResize);
-
-            // Кнопка старта
-            document.getElementById('startButton').addEventListener('click', () => {
-                controls.lock();
-                document.getElementById('startButton').style.display = 'none';
-            });
+        function generateWorld() {
+            // Генерация базовой земли
+            for(let x = -10; x <= 10; x++) {
+                for(let z = -10; z <= 10; z++) {
+                    addBlock(x, -1, z, 'grass');
+                    for(let y = -2; y >= -5; y--) {
+                        addBlock(x, y, z, 'dirt');
+                    }
+                }
+            }
         }
 
         function addBlock(x, y, z, type) {
@@ -122,16 +135,11 @@
             if(blocks.has(key)) return;
 
             const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            const materials = Array(6).fill(new THREE.MeshStandardMaterial({ 
-                map: textures[type]
-            }));
-
-            const cube = new THREE.Mesh(geometry, materials);
+            const cube = new THREE.Mesh(geometry, materials[type]);
             cube.position.set(x, y, z);
             scene.add(cube);
             
             blocks.set(key, { type, mesh: cube });
-            saveWorld();
         }
 
         function removeBlock(x, y, z) {
@@ -141,134 +149,90 @@
             const block = blocks.get(key);
             scene.remove(block.mesh);
             blocks.delete(key);
-            saveWorld();
+            addToInventory(block.type);
         }
 
-        function saveWorld() {
-            const saveData = Array.from(blocks).map(([key, value]) => ({
-                pos: key.split(',').map(Number),
-                type: value.type
-            }));
-            localStorage.setItem('minecraftWorld', JSON.stringify(saveData));
+        function addToInventory(type, count = 1) {
+            const slot = inventory.findIndex(s => s?.type === type);
+            if(slot > -1) {
+                inventory[slot].count += count;
+            } else {
+                const emptySlot = inventory.findIndex(s => !s);
+                if(emptySlot > -1) {
+                    inventory[emptySlot] = { type, count };
+                }
+            }
+            updateInventory();
         }
 
-        function loadWorld() {
-            const saveData = JSON.parse(localStorage.getItem('minecraftWorld') || '[]');
-            saveData.forEach(({pos, type}) => {
-                addBlock(pos[0], pos[1], pos[2], type);
-            });
-        }
-
-        function setupInventory() {
-            const inventory = document.getElementById('inventory');
-            const items = ['grass', 'dirt', 'stone', 'wood'];
-            
-            items.forEach((item, index) => {
+        function updateInventory() {
+            const hud = document.getElementById('hud');
+            hud.innerHTML = '';
+            inventory.forEach((item, index) => {
                 const slot = document.createElement('div');
                 slot.className = `slot ${index === 0 ? 'active' : ''}`;
-                slot.style.backgroundImage = `url(${textures[item].image.src})`;
-                slot.onclick = () => selectBlock(item, slot);
-                inventory.appendChild(slot);
+                if(item) {
+                    slot.style.backgroundImage = `url(${materials[item.type].map.image.src})`;
+                    slot.innerHTML = `<div>${item.count}</div>`;
+                }
+                slot.addEventListener('click', () => selectSlot(index));
+                hud.appendChild(slot);
             });
         }
 
-        function selectBlock(type, element) {
-            currentBlockType = type;
+        function selectSlot(index) {
+            currentBlockType = inventory[index]?.type;
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
-            element.classList.add('active');
+            document.querySelectorAll('.slot')[index].classList.add('active');
         }
 
-        function onKeyDown(event) {
-            switch(event.key.toLowerCase()) {
-                case 'w': moveState.forward = true; break;
-                case 's': moveState.backward = true; break;
-                case 'a': moveState.left = true; break;
-                case 'd': moveState.right = true; break;
+        function setupControls() {
+            controls = new THREE.PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
+            camera.position.set(0, 5, 0);
+
+            document.addEventListener('keydown', e => {
+                if(e.key === 'e') document.getElementById('crafting').style.display = 'block';
+                if(e.key === 'Escape') document.getElementById('crafting').style.display = 'none';
+                // ... остальные обработчики ...
+            });
+
+            // ... остальные настройки управления ...
+        }
+
+        function checkCrafting() {
+            const recipe = recipes.find(r => 
+                r.input.every((item, index) => 
+                    item === craftingSlots[index]?.type
+                )
+            );
+            if(recipe) {
+                // Обновляем слот результата
             }
         }
 
-        function onKeyUp(event) {
-            switch(event.key.toLowerCase()) {
-                case 'w': moveState.forward = false; break;
-                case 's': moveState.backward = false; break;
-                case 'a': moveState.left = false; break;
-                case 'd': moveState.right = false; break;
+        function saveGame() {
+            localStorage.setItem('save', JSON.stringify({
+                inventory,
+                blocks: Array.from(blocks).map(([key, val]) => ({
+                    pos: key.split(',').map(Number),
+                    type: val.type
+                }))
+            }));
+        }
+
+        function loadSave() {
+            const save = JSON.parse(localStorage.getItem('save'));
+            if(save) {
+                inventory = save.inventory;
+                save.blocks.forEach(({pos, type}) => addBlock(...pos, type));
             }
         }
 
-        function onMouseDown(event) {
-            if(!controls.isLocked) return;
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(), camera);
-            
-            const intersects = raycaster.intersectObjects(scene.children);
-            if(intersects.length > 0) {
-                const intersect = intersects[0];
-                const pos = intersect.object.position;
-                
-                if(event.button === 0) {
-                    removeBlock(pos.x, pos.y, pos.z);
-                } else if(event.button === 2) {
-                    const normal = intersect.face.normal;
-                    const newPos = pos.clone().add(normal.multiplyScalar(BLOCK_SIZE));
-                    addBlock(
-                        Math.round(newPos.x),
-                        Math.round(newPos.y),
-                        Math.round(newPos.z),
-                        currentBlockType
-                    );
-                }
-            }
-        }
-
-        function onMouseMove(event) {
-            if(controls.isLocked) {
-                camera.rotation.y -= event.movementX * MOUSE_SENSITIVITY;
-                camera.rotation.x -= event.movementY * MOUSE_SENSITIVITY;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-            }
-        }
-
-        function updatePlayerPosition() {
-            const direction = new THREE.Vector3();
-            const rotation = camera.rotation.y;
-
-            if(moveState.forward) direction.z -= Math.cos(rotation);
-            if(moveState.backward) direction.z += Math.cos(rotation);
-            if(moveState.left) direction.x -= Math.sin(rotation);
-            if(moveState.right) direction.x += Math.sin(rotation);
-
-            direction.normalize();
-            camera.position.addScaledVector(direction, MOVEMENT_SPEED);
-            
-            // Простая проверка коллизий
-            const playerPos = camera.position.clone();
-            playerPos.y -= 1;
-            for(let [key] of blocks) {
-                const [x, y, z] = key.split(',').map(Number);
-                const blockPos = new THREE.Vector3(x, y, z);
-                if(playerPos.distanceTo(blockPos) < 1.2) {
-                    camera.position.subScaledVector(direction, MOVEMENT_SPEED);
-                    break;
-                }
-            }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if(controls.isLocked) updatePlayerPosition();
-            renderer.render(scene, camera);
-        }
+        // ... остальные функции ...
 
         init();
-        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>
 </html>
