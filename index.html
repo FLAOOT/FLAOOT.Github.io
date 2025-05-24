@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>lolt</title>
+    <title>TeleCraft</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -184,8 +184,6 @@
         let blocks = new Map();
         const BLOCK_SIZE = 1;
         let currentBlockType = 'grass';
-        let velocity = new THREE.Vector3();
-        let canJump = false;
         let isFlying = true;
         let worldSize = 50;
         let saveTimeout;
@@ -216,8 +214,8 @@
             constructor() {
                 this.height = 1.8;
                 this.radius = 0.3;
-                this.position = new THREE.Vector3(0, 15, 0);
-                this.flySpeed = 8;
+                this.position = new THREE.Vector3(0, 12, 0);
+                this.verticalSpeed = 0;
             }
         }
 
@@ -342,27 +340,32 @@
         }
 
         function updatePlayer(delta) {
-            if(isFlying) {
-                velocity.set(0, 0, 0);
-                canJump = true;
+            const direction = new THREE.Vector3();
+            
+            if(keys['w']) direction.z -= 1;
+            if(keys['s']) direction.z += 1;
+            if(keys['a']) direction.x -= 1;
+            if(keys['d']) direction.x += 1;
 
-                const direction = new THREE.Vector3();
-                if(keys['w']) direction.z -= 1;
-                if(keys['s']) direction.z += 1;
-                if(keys['a']) direction.x -= 1;
-                if(keys['d']) direction.x += 1;
-                if(keys[' ']) direction.y += 1;
-                if(keys.shift) direction.y -= 1;
+            if(keys[' ']) player.verticalSpeed = 1;
+            else if(keys.shift) player.verticalSpeed = -1;
+            else player.verticalSpeed = 0;
 
-                if(direction.length() > 0) {
-                    direction.normalize();
-                    direction.applyEuler(new THREE.Euler(0, yaw, 0));
-                    player.position.add(direction.multiplyScalar(moveSpeed * delta));
-                }
+            if(direction.length() > 0 || player.verticalSpeed !== 0) {
+                direction.normalize();
+                direction.applyEuler(new THREE.Euler(0, yaw, 0));
+                
+                const moveVector = new THREE.Vector3(
+                    direction.x * moveSpeed * delta,
+                    player.verticalSpeed * moveSpeed * delta,
+                    direction.z * moveSpeed * delta
+                );
+                
+                player.position.add(moveVector);
             }
 
             player.position.x = THREE.MathUtils.clamp(player.position.x, -worldSize, worldSize);
-            player.position.y = THREE.MathUtils.clamp(player.position.y, 10, 256); // Фикс минимальной высоты
+            player.position.y = THREE.MathUtils.clamp(player.position.y, 10, 256);
             player.position.z = THREE.MathUtils.clamp(player.position.z, -worldSize, worldSize);
 
             camera.position.copy(player.position.add(new THREE.Vector3(0, player.height/2, 0)));
@@ -399,8 +402,7 @@
         }
 
         function createGround() {
-            // Стартовая платформа 11x11
-            const platformSize = 11;
+            const platformSize = 7;
             for(let x = -platformSize; x <= platformSize; x++) {
                 for(let z = -platformSize; z <= platformSize; z++) {
                     for(let y = 10; y >= 8; y--) {
@@ -409,7 +411,6 @@
                 }
             }
 
-            // Основной мир
             for(let x = -worldSize; x <= worldSize; x++) {
                 for(let z = -worldSize; z <= worldSize; z++) {
                     for(let y = 7; y >= -3; y--) {
