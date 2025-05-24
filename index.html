@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>TelegramCraft Ultimate</title>
+    <title>lolopop</title>
     <style>
         :root {
             --tg-bg: #17212b;
@@ -14,7 +14,7 @@
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             background: var(--tg-bg);
             color: var(--tg-text);
         }
@@ -28,63 +28,7 @@
             padding: 2rem;
             border-radius: 15px;
             text-align: center;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
             z-index: 1000;
-        }
-
-        #loadPreview {
-            width: 300px;
-            height: 200px;
-            background: #1f2b38;
-            margin: 15px 0;
-            border-radius: 10px;
-            overflow: hidden;
-            cursor: pointer;
-        }
-
-        .tg-button {
-            background: var(--tg-bg);
-            color: var(--tg-text);
-            border: 2px solid var(--tg-border);
-            padding: 10px 20px;
-            margin: 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .tg-button:hover {
-            background: var(--tg-border);
-        }
-
-        #inventory {
-            position: fixed;
-            bottom: 20px;
-            width: 80%;
-            left: 10%;
-            background: var(--tg-primary);
-            padding: 15px;
-            border-radius: 15px;
-            display: none;
-            grid-template-columns: repeat(9, 1fr);
-            gap: 5px;
-            border: 2px solid var(--tg-border);
-        }
-
-        .slot {
-            aspect-ratio: 1;
-            background: var(--tg-bg);
-            border: 2px solid var(--tg-border);
-            border-radius: 8px;
-            cursor: pointer;
-            position: relative;
-            transition: transform 0.2s;
-        }
-
-        .active {
-            border-color: #00bcd4;
-            box-shadow: 0 0 10px #00bcd4;
-            transform: scale(1.1);
         }
 
         #crosshair {
@@ -92,44 +36,46 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: var(--tg-text);
+            color: white;
             font-size: 24px;
             pointer-events: none;
         }
 
-        #topBar {
+        #inventory {
             position: fixed;
-            top: 0;
-            width: 100%;
-            padding: 10px;
-            background: var(--tg-primary);
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 2px solid var(--tg-border);
-            z-index: 500;
+            bottom: 20px;
+            width: 80%;
+            left: 10%;
+            background: rgba(43, 82, 120, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            display: none;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 5px;
+        }
+
+        .slot {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #2f3942;
+            border-radius: 8px;
+            cursor: pointer;
+            background: rgba(23, 33, 43, 0.8);
+        }
+
+        .active {
+            border-color: #00bcd4;
+            box-shadow: 0 0 10px #00bcd4;
         }
     </style>
 </head>
 <body>
     <div id="startMenu">
-        <h1>TelegramCraft Ultimate</h1>
-        <div id="loadPreview" onclick="loadGame()">
-            <div style="padding:10px">
-                <h3>Последнее сохранение:</h3>
-                <p id="lastSaveTime">Нет данных</p>
-                <p id="blockCount">0 блоков</p>
-            </div>
-        </div>
-        <button class="tg-button" onclick="startNewGame()">Новая игра</button>
-        <button class="tg-button" onclick="loadGame()">Загрузить</button>
+        <h1>Minecraft Web</h1>
+        <button onclick="startGame()">Начать игру</button>
     </div>
 
-    <div id="topBar">
-        <button class="tg-button" onclick="toggleInventory()">🧰 Инвентарь</button>
-        <div class="tg-button">Блоков: <span id="currentBlocks">0</span></div>
-    </div>
-
-    <div id="crosshair">✛</div>
+    <div id="crosshair">+</div>
     <div id="inventory"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -139,336 +85,166 @@
         const BLOCK_SIZE = 1;
         let currentBlockType = 'grass';
         const clock = new THREE.Clock();
-        let lastSave = null;
-
-        const PHYSICS = {
-            gravity: 30,
-            jumpForce: 15,
-            friction: 0.85,
-            airResistance: 0.97,
-            collisionDamping: 0.4,
-            playerSpeed: 25
-        };
-
-        const blockMaterials = {
-            grass: [0x00ff00, '🌿'],
-            dirt: [0x8B4513, '🟫'],
-            stone: [0x808080, '🪨'],
-            wood: [0x8B5A2B, '🪵'],
-            glass: [0x00ffff, '🔲'],
-            red: [0xff0000, '🟥'],
-            blue: [0x0000ff, '🟦'],
-            yellow: [0xffff00, '🟨'],
-            purple: [0x800080, '🟪']
-        };
-
-        class Player {
-            constructor() {
-                this.position = new THREE.Vector3(0, 20, 0);
-                this.velocity = new THREE.Vector3();
-                this.size = new THREE.Vector3(0.6, 1.8, 0.6);
-                this.onGround = false;
-            }
-
-            getCollisionBox() {
-                return new THREE.Box3(
-                    new THREE.Vector3(
-                        this.position.x - this.size.x/2,
-                        this.position.y,
-                        this.position.z - this.size.z/2
-                    ),
-                    new THREE.Vector3(
-                        this.position.x + this.size.x/2,
-                        this.position.y + this.size.y,
-                        this.position.z + this.size.z/2
-                    )
-                );
-            }
-        }
-
-        let player = new Player();
         let keys = {};
 
-        function startNewGame() {
-            localStorage.removeItem('mcWorld');
-            initGame();
-        }
+        const blockMaterials = {
+            grass: 0x00ff00,
+            dirt: 0x8B4513,
+            stone: 0x808080,
+            wood: 0x8B5A2B,
+            glass: 0x00ffff
+        };
 
-        function loadGame() {
-            initGame();
-        }
-
-        function initGame() {
+        function startGame() {
             document.getElementById('startMenu').style.display = 'none';
-            setupThreeJS();
-            initWorld();
-            initInventory();
-            initControls();
-            updateUI();
+            init();
+            animate();
         }
 
-        function setupThreeJS() {
+        function init() {
+            // Scene setup
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
-            
+
+            // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.copy(player.position);
-            
+            camera.position.set(0, 10, 10);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // Lighting
             const light = new THREE.DirectionalLight(0xffffff, 1);
             light.position.set(100, 100, 100);
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
-            raycaster = new THREE.Raycaster();
-        }
-
-        function initWorld() {
-            const savedData = localStorage.getItem('mcWorld');
-            if(savedData) {
-                JSON.parse(savedData).forEach(block => {
-                    createBlock(block.x, block.y, block.z, block.type);
-                });
-            } else {
-                generateTerrain();
-            }
-            updateBlockCount();
-        }
-
-        function generateTerrain() {
-            for(let x = -20; x <= 20; x++) {
-                for(let z = -20; z <= 20; z++) {
-                    createBlock(x, 0, z, 'grass');
-                    for(let y = -1; y >= -3; y--) {
-                        createBlock(x, y, z, 'dirt');
-                    }
+            // Ground generation
+            for(let x = -10; x <= 10; x++) {
+                for(let z = -10; z <= 10; z++) {
+                    addBlock(x, -1, z, 'dirt');
                 }
             }
+
+            // Raycaster
+            raycaster = new THREE.Raycaster();
+
+            // Inventory
+            initInventory();
+
+            // Event listeners
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+            document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+            document.addEventListener('click', () => {
+                document.body.requestPointerLock();
+            });
         }
 
         function initInventory() {
             const inventory = document.getElementById('inventory');
-            Object.entries(blockMaterials).forEach(([type, [color, emoji]], i) => {
+            Object.keys(blockMaterials).forEach((type, i) => {
                 const slot = document.createElement('div');
                 slot.className = 'slot';
-                slot.innerHTML = `<div style="font-size:24px">${emoji}</div>`;
-                slot.onclick = () => selectBlock(type);
+                slot.style.backgroundColor = `#${blockMaterials[type].toString(16)}`;
+                slot.onclick = () => {
+                    document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+                    slot.classList.add('active');
+                    currentBlockType = type;
+                };
                 inventory.appendChild(slot);
             });
-            selectBlock('grass');
+            inventory.children[0].classList.add('active');
         }
 
-        function selectBlock(type) {
-            currentBlockType = type;
-            document.querySelectorAll('.slot').forEach((s, i) => {
-                s.classList.toggle('active', Object.keys(blockMaterials)[i] === type);
-            });
-        }
-
-        function toggleInventory() {
-            const inv = document.getElementById('inventory');
-            inv.style.display = inv.style.display === 'grid' ? 'none' : 'grid';
-        }
-
-        function initControls() {
-            document.addEventListener('click', () => {
-                if (!document.pointerLockElement) {
-                    document.body.requestPointerLock();
-                }
-            });
-
-            document.addEventListener('mousemove', e => {
-                if (document.pointerLockElement) {
-                    camera.rotation.y -= e.movementX * 0.002;
-                    camera.rotation.x -= e.movementY * 0.002;
-                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-                }
-            });
-
-            document.addEventListener('keydown', e => {
-                const key = e.key.toLowerCase();
-                keys[key] = true;
-                
-                if (key >= '1' && key <= '9') {
-                    const index = parseInt(key) - 1;
-                    const blockTypes = Object.keys(blockMaterials);
-                    if (blockTypes[index]) selectBlock(blockTypes[index]);
-                }
-            });
-
-            document.addEventListener('keyup', e => {
-                keys[e.key.toLowerCase()] = false;
-            });
-
-            document.addEventListener('mousedown', e => {
-                if (!document.pointerLockElement) return;
-                
-                const mouse = new THREE.Vector2(
-                    (e.clientX / window.innerWidth) * 2 - 1,
-                    -(e.clientY / window.innerHeight) * 2 + 1
-                );
-                
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(scene.children);
-                
-                if (intersects.length > 0) {
-                    const intersect = intersects[0];
-                    const pos = intersect.object.position;
-                    
-                    if (e.button === 0) {
-                        removeBlock(pos);
-                    } else if (e.button === 2) {
-                        const normal = intersect.face.normal;
-                        const newPos = pos.clone().add(normal);
-                        createBlock(newPos.round());
-                    }
-                }
-            });
-
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        }
-
-        function handlePhysics(delta) {
-            // Движение
-            const direction = new THREE.Vector3();
-            if (keys.w) direction.z -= 1;
-            if (keys.s) direction.z += 1;
-            if (keys.a) direction.x -= 1;
-            if (keys.d) direction.x += 1;
-            
-            direction.normalize();
-            direction.applyEuler(camera.rotation);
-            direction.multiplyScalar(PHYSICS.playerSpeed * delta);
-            
-            player.velocity.add(direction);
-            
-            // Гравитация
-            player.velocity.y -= PHYSICS.gravity * delta;
-            
-            // Применение сопротивления
-            player.velocity.x *= PHYSICS.friction;
-            player.velocity.z *= PHYSICS.friction;
-            player.velocity.multiplyScalar(PHYSICS.airResistance);
-
-            // Обновление позиции
-            const newPos = player.position.clone().add(player.velocity.clone().multiplyScalar(delta));
-            handleCollisions(newPos);
-            
-            // Обновление камеры
-            camera.position.copy(player.position);
-            camera.position.y += 0.9;
-        }
-
-        function handleCollisions(newPos) {
-            player.position.copy(newPos);
-            const playerBox = player.getCollisionBox();
-            
-            blocks.forEach(block => {
-                const blockBox = new THREE.Box3().setFromObject(block);
-                if (playerBox.intersectsBox(blockBox)) {
-                    const overlap = playerBox.intersect(blockBox);
-                    const depth = overlap.getSize(new THREE.Vector3());
-                    
-                    const direction = new THREE.Vector3()
-                        .subVectors(player.position, block.position)
-                        .normalize();
-                    
-                    if (depth.y > depth.x && depth.y > depth.z) {
-                        player.velocity.y *= -PHYSICS.collisionDamping;
-                        player.position.y += direction.y * depth.y;
-                        player.onGround = true;
-                    } else {
-                        player.velocity.x *= -PHYSICS.collisionDamping;
-                        player.velocity.z *= -PHYSICS.collisionDamping;
-                        player.position.addScaledVector(direction, depth.x + 0.01);
-                    }
-                }
-            });
-        }
-
-        function createBlock(x, y, z, type = currentBlockType) {
-            const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
-            if (blocks.has(key)) return;
+        function addBlock(x, y, z, type) {
+            const key = `${x},${y},${z}`;
+            if(blocks.has(key)) return;
 
             const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
             const material = new THREE.MeshPhongMaterial({ 
-                color: blockMaterials[type][0],
+                color: blockMaterials[type],
                 transparent: type === 'glass',
                 opacity: type === 'glass' ? 0.7 : 1
             });
-            
             const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(
-                Math.round(x),
-                Math.round(y),
-                Math.round(z)
-            );
-            cube.userData = { type };
+            cube.position.set(x, y, z);
             scene.add(cube);
             blocks.set(key, cube);
-            saveGame();
         }
 
-        function removeBlock(pos) {
-            const key = `${Math.round(pos.x)},${Math.round(pos.y)},${Math.round(pos.z)}`;
-            if (blocks.has(key)) {
+        function removeBlock(x, y, z) {
+            const key = `${x},${y},${z}`;
+            if(blocks.has(key)) {
                 scene.remove(blocks.get(key));
                 blocks.delete(key);
-                saveGame();
             }
         }
 
-        function saveGame() {
-            const saveData = Array.from(blocks).map(([key, block]) => ({
-                x: block.position.x,
-                y: block.position.y,
-                z: block.position.z,
-                type: block.userData.type
-            }));
-            
-            localStorage.setItem('mcWorld', JSON.stringify(saveData));
-            lastSave = new Date();
-            updateUI();
+        function onMouseDown(e) {
+            const mouse = new THREE.Vector2(
+                (e.clientX / window.innerWidth) * 2 - 1,
+                -(e.clientY / window.innerHeight) * 2 + 1
+            );
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+
+            if(intersects.length > 0) {
+                const intersect = intersects[0];
+                const pos = intersect.object.position;
+                
+                if(e.button === 0) {
+                    removeBlock(pos.x, pos.y, pos.z);
+                } else if(e.button === 2) {
+                    const normal = intersect.face.normal;
+                    const newPos = pos.clone().add(normal.multiplyScalar(BLOCK_SIZE));
+                    addBlock(
+                        Math.round(newPos.x),
+                        Math.round(newPos.y),
+                        Math.round(newPos.z),
+                        currentBlockType
+                    );
+                }
+            }
         }
 
-        function updateUI() {
-            document.getElementById('currentBlocks').textContent = blocks.size;
-            document.getElementById('lastSaveTime').textContent = lastSave ? lastSave.toLocaleString() : 'Нет данных';
-            document.getElementById('blockCount').textContent = `${blocks.size} блоков`;
+        function onMouseMove(e) {
+            if(document.pointerLockElement === document.body) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            const delta = Math.min(0.05, clock.getDelta());
             
-            if (document.pointerLockElement) {
-                handlePhysics(delta);
-                
-                if (keys[' '] && player.onGround) {
-                    player.velocity.y = PHYSICS.jumpForce;
-                    player.onGround = false;
-                }
-            }
+            // Movement
+            const delta = clock.getDelta();
+            const speed = 5 * delta;
+            const direction = new THREE.Vector3();
+
+            if(keys.w]) direction.z -= 1;
+            if(keys.s]) direction.z += 1;
+            if(keys.a]) direction.x -= 1;
+            if(keys.d]) direction.x += 1;
+            if(keys[' ']) camera.position.y += speed;
+            if(keys.shift]) camera.position.y -= speed;
+
+            direction.normalize();
+            direction.applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
+            camera.position.add(direction.multiplyScalar(speed));
 
             renderer.render(scene, camera);
         }
 
-        // Инициализация при загрузке
-        window.onload = () => {
-            if (localStorage.getItem('mcWorld')) {
-                const saveData = JSON.parse(localStorage.getItem('mcWorld'));
-                document.getElementById('blockCount').textContent = `${saveData.length} блоков`;
-                document.getElementById('lastSaveTime').textContent = 
-                    new Date(JSON.parse(localStorage.getItem('mcWorldMeta'))?.time || Date.now()).toLocaleString();
-            }
-        };
+        // Start the game
+        init();
     </script>
 </body>
 </html>
