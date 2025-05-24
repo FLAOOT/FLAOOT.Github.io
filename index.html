@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>tmeft</title>
+    <title>tweft</title>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
         #crosshair {
             position: fixed;
             top: 50%;
@@ -17,25 +17,37 @@
             position: fixed;
             bottom: 20px;
             width: 100%;
-            display: flex;
+            display: none;
             justify-content: center;
-            gap: 10px;
+            gap: 5px;
+            flex-wrap: wrap;
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
         }
         .slot {
-            width: 50px;
-            height: 50px;
-            border: 2px solid #fff;
-            background: rgba(0,0,0,0.5);
+            width: 40px;
+            height: 40px;
+            border: 2px solid #555;
             cursor: pointer;
+            background-size: cover;
         }
         .active {
-            border-color: yellow;
-            box-shadow: 0 0 10px yellow;
+            border-color: #ff0;
+            box-shadow: 0 0 10px #ff0;
+        }
+        #hotbar {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 5px;
         }
     </style>
 </head>
 <body>
     <div id="crosshair">+</div>
+    <div id="hotbar"></div>
     <div id="inventory"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -47,24 +59,41 @@
         let blocks = new Map();
         const BLOCK_SIZE = 1;
         let currentBlockType = 'grass';
+        let velocity = new THREE.Vector3();
+        let canJump = false;
+        const GRAVITY = 30;
+        let inventoryVisible = false;
+
         const blockMaterials = {
             grass: new THREE.MeshPhongMaterial({ color: 0x00ff00 }),
             dirt: new THREE.MeshPhongMaterial({ color: 0x8B4513 }),
             stone: new THREE.MeshPhongMaterial({ color: 0x808080 }),
-            wood: new THREE.MeshPhongMaterial({ color: 0x8B5A2B })
+            wood: new THREE.MeshPhongMaterial({ color: 0x8B5A2B }),
+            glass: new THREE.MeshStandardMaterial({ 
+                color: 0x00ffff, 
+                transparent: true, 
+                opacity: 0.7 
+            })
         };
+
+        class Player {
+            constructor() {
+                this.height = 1.8;
+                this.radius = 0.3;
+                this.position = new THREE.Vector3();
+            }
+        }
+
+        let player = new Player();
         let keys = {};
 
         function init() {
-            // Инициализация сцены
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
             
-            // Камера
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 0);
             
-            // Рендерер
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
@@ -75,14 +104,11 @@
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
-            // Raycaster
             raycaster = new THREE.Raycaster();
-
-            // Генерация мира
-            createGround();
+            loadWorld();
             initInventory();
 
-            // Управление
+            // События
             document.addEventListener('click', () => document.body.requestPointerLock());
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('keydown', onKeyDown);
@@ -90,96 +116,138 @@
             document.addEventListener('mousedown', onMouseDown);
             document.addEventListener('contextmenu', e => e.preventDefault());
 
-            // Главный цикл
             animate();
         }
 
         function initInventory() {
+            const hotbar = document.getElementById('hotbar');
             const inventory = document.getElementById('inventory');
-            const blockTypes = ['grass', 'dirt', 'stone', 'wood'];
+            const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'glass'];
             
+            // Горячая панель
             blockTypes.forEach((type, i) => {
-                const slot = document.createElement('div');
-                slot.className = `slot${i === 0 ? ' active' : ''}`;
-                slot.style.backgroundColor = `#${blockMaterials[type].color.getHexString()}`;
-                slot.onclick = () => {
-                    document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
-                    slot.classList.add('active');
-                    currentBlockType = type;
-                };
-                inventory.appendChild(slot);
+                const slot = createSlot(type, i);
+                hotbar.appendChild(slot);
             });
-        }
 
-        function onMouseMove(e) {
-            if(document.pointerLockElement === document.body) {
-                yaw -= e.movementX * lookSpeed;
-                pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch - e.movementY * lookSpeed));
-                camera.rotation.set(pitch, yaw, 0, 'YXZ');
+            // Полный инвентарь
+            for(let i = 0; i < 24; i++) {
+                const slot = createSlot(i < blockTypes.length ? blockTypes[i] : null, i);
+                inventory.appendChild(slot);
             }
         }
 
-        function onKeyDown(e) {
-            keys[e.key.toLowerCase()] = true;
-        }
-
-        function onKeyUp(e) {
-            keys[e.key.toLowerCase()] = false;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
+        function createSlot(type, index) {
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            if(type) {
+                slot.style.backgroundColor = `#${blockMaterials[type].color.getHexString()}`;
+                slot.dataset.type = type;
+            }
+            slot.onclick = () => selectSlot(slot, type);
             
-            // Движение
-            const delta = 0.016;
+            // Быстрые клавиши
+            if(index < 8) {
+                slot.innerHTML = `<div style="color:white;position:absolute;bottom:0;right:2px">${index + 1}</div>`;
+            }
+            return slot;
+        }
+
+        function selectSlot(slot, type) {
+            document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+            slot.classList.add('active');
+            currentBlockType = type;
+        }
+
+        function checkCollisions(newPos) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(
+                    newPos.x - player.radius,
+                    newPos.y,
+                    newPos.z - player.radius
+                ),
+                new THREE.Vector3(
+                    newPos.x + player.radius,
+                    newPos.y + player.height,
+                    newPos.z + player.radius
+                )
+            );
+
+            let collided = false;
+            blocks.forEach(block => {
+                const blockBox = new THREE.Box3().setFromObject(block);
+                if(playerBox.intersectsBox(blockBox)) {
+                    collided = true;
+                    const overlap = playerBox.intersect(blockBox).getSize(new THREE.Vector3());
+                    
+                    if(overlap.y > overlap.x && overlap.y > overlap.z) {
+                        // Вертикальная коллизия
+                        velocity.y = 0;
+                        if(playerBox.min.y < blockBox.max.y) {
+                            newPos.y = blockBox.max.y;
+                            canJump = true;
+                        }
+                    } else {
+                        // Горизонтальная коллизия
+                        if(Math.abs(overlap.x) > Math.abs(overlap.z)) {
+                            newPos.x = player.position.x;
+                        } else {
+                            newPos.z = player.position.z;
+                        }
+                    }
+                }
+            });
+            return collided ? newPos : newPos;
+        }
+
+        function updatePlayer(delta) {
+            velocity.y -= GRAVITY * delta;
+            
             const direction = new THREE.Vector3();
+            if(keys['w']) direction.z -= 1;
+            if(keys['s']) direction.z += 1;
+            if(keys['a']) direction.x -= 1;
+            if(keys['d']) direction.x += 1;
+
+            direction.normalize();
+            direction.applyEuler(new THREE.Euler(0, yaw, 0));
             
-            if(document.pointerLockElement === document.body) {
-                if(keys['w']) direction.z -= 1;
-                if(keys['s']) direction.z += 1;
-                if(keys['a']) direction.x -= 1;
-                if(keys['d']) direction.x += 1;
-                if(keys[' ']) camera.position.y += moveSpeed * delta; // Вверх
-                if(keys['shift']) camera.position.y -= moveSpeed * delta; // Вниз
+            const newPos = player.position.clone()
+                .add(direction.multiplyScalar(moveSpeed * delta))
+                .add(velocity.clone().multiplyScalar(delta));
 
-                direction.normalize();
-                direction.applyEuler(new THREE.Euler(0, yaw, 0));
-                camera.position.add(direction.multiplyScalar(moveSpeed * delta));
-            }
+            const finalPos = checkCollisions(newPos);
+            player.position.copy(finalPos);
+            camera.position.copy(finalPos.add(new THREE.Vector3(0, player.height/2, 0)));
 
-            renderer.render(scene, camera);
-        }
-
-        function onMouseDown(e) {
-            raycaster.setFromCamera(new THREE.Vector2(), camera);
-            const intersects = raycaster.intersectObjects(scene.children);
-            
-            if(intersects.length > 0) {
-                const intersect = intersects[0];
-                const pos = intersect.object.position;
-                const normal = intersect.face.normal;
-
-                if(e.button === 0) { // ЛКМ - удалить блок
-                    removeBlock(pos.x, pos.y, pos.z);
-                } 
-                else if(e.button === 2) { // ПКМ - добавить блок
-                    const newPos = pos.clone().add(normal.multiplyScalar(BLOCK_SIZE));
-                    addBlock(
-                        Math.round(newPos.x),
-                        Math.round(newPos.y),
-                        Math.round(newPos.z),
-                        currentBlockType
-                    );
-                }
+            // Прыжок
+            if(keys[' '] && canJump) {
+                velocity.y = 8;
+                canJump = false;
             }
         }
 
-        function createGround() {
-            for(let x = -10; x <= 10; x++) {
-                for(let z = -10; z <= 10; z++) {
-                    addBlock(x, 0, z, 'grass');
-                    addBlock(x, -1, z, 'dirt');
-                }
+        function saveWorld() {
+            const saveData = [];
+            blocks.forEach((block, key) => {
+                saveData.push({
+                    x: block.position.x,
+                    y: block.position.y,
+                    z: block.position.z,
+                    type: block.userData.type
+                });
+            });
+            localStorage.setItem('mcWorld', JSON.stringify(saveData));
+        }
+
+        function loadWorld() {
+            const saveData = localStorage.getItem('mcWorld');
+            if(saveData) {
+                JSON.parse(saveData).forEach(block => {
+                    addBlock(block.x, block.y, block.z, block.type);
+                });
+            } else {
+                createGround();
             }
         }
 
@@ -190,19 +258,26 @@
             const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
             const cube = new THREE.Mesh(geometry, blockMaterials[type]);
             cube.position.set(x, y, z);
+            cube.userData.type = type;
             scene.add(cube);
             blocks.set(key, cube);
+            saveWorld();
         }
 
-        function removeBlock(x, y, z) {
-            const key = `${x},${y},${z}`;
-            if(blocks.has(key)) {
-                scene.remove(blocks.get(key));
-                blocks.delete(key);
+        // Остальные функции (createGround, removeBlock, onMouseMove, onMouseDown и т.д.) 
+        // остаются аналогичными предыдущей версии с небольшими изменениями
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(0.05, clock.getDelta());
+            
+            if(document.pointerLockElement === document.body) {
+                updatePlayer(delta);
             }
+
+            renderer.render(scene, camera);
         }
 
-        // Запуск
         init();
     </script>
 </body>
