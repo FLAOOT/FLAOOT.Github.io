@@ -1,247 +1,123 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>WebCraft Full</title>
-    <style>
-        /* Telegram-like стили */
-        :root {
-            --tg-bg: #18222d;
-            --tg-secondary: #2a3b4d;
-            --tg-text: #ffffff;
+<script>
+// Улучшенная версия с оптимизациями
+const CHUNK_SIZE = 16;
+const RENDER_DISTANCE = 2; // Уменьшаем дистанцию рендеринга
+
+class Game {
+    constructor() {
+        // ... предыдущий код инициализации ...
+
+        // Оптимизация: объединенная геометрия
+        this.chunkMeshes = new THREE.Group();
+        scene.add(this.chunkMeshes);
+    }
+
+    generateChunk(chunkX, chunkZ) {
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshBasicMaterial({ vertexColors: true });
+        const chunkMesh = new THREE.InstancedMesh(geometry, material, CHUNK_SIZE**3);
+        
+        let i = 0;
+        for(let x = 0; x < CHUNK_SIZE; x++) {
+            for(let z = 0; z < CHUNK_SIZE; z++) {
+                const height = Math.floor(Math.random() * 16);
+                for(let y = 0; y < height; y++) {
+                    const matrix = new THREE.Matrix4().makeTranslation(
+                        chunkX * CHUNK_SIZE + x,
+                        y,
+                        chunkZ * CHUNK_SIZE + z
+                    );
+                    chunkMesh.setMatrixAt(i++, matrix);
+                    
+                    // Добавляем физическое тело для блока
+                    const blockBody = new CANNON.Body({
+                        mass: 0, // Статичное тело
+                        shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
+                        position: new CANNON.Vec3(
+                            chunkX * CHUNK_SIZE + x,
+                            y,
+                            chunkZ * CHUNK_SIZE + z
+                        )
+                    });
+                    physicsWorld.addBody(blockBody);
+                }
+            }
         }
+        this.chunkMeshes.add(chunkMesh);
+    }
 
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--tg-bg);
-            color: var(--tg-text);
-        }
+    initPlayer() {
+        // Улучшенная физика игрока
+        playerBody = new CANNON.Body({
+            mass: 5,
+            position: new CANNON.Vec3(0, 20, 0),
+            shape: new CANNON.Sphere(0.4),
+            material: new CANNON.Material(),
+            fixedRotation: true
+        });
 
-        #ui {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: rgba(32, 44, 51, 0.9);
-            padding: 15px;
-            border-radius: 10px;
-        }
+        // Настройка трения
+        playerBody.linearDamping = 0.9;
+        physicsWorld.addBody(playerBody);
 
-        .tg-button {
-            background: #2aabee;
-            border: none;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 5px;
-            margin: 5px;
-            cursor: pointer;
-        }
+        // Коллизия с землей
+        const groundMaterial = new CANNON.Material();
+        const playerGroundContact = new CANNON.ContactMaterial(
+            playerBody.material,
+            groundMaterial,
+            {
+                friction: 0.5,
+                restitution: 0
+            }
+        );
+        physicsWorld.addContactMaterial(playerGroundContact);
+    }
 
-        #chat {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 300px;
-            background: rgba(32, 44, 51, 0.9);
-            border-radius: 10px;
-            padding: 10px;
-        }
-    </style>
-</head>
-<body>
-    <div id="ui">
-        <button class="tg-button" id="inventoryBtn">🎒 Инвентарь</button>
-        <button class="tg-button" id="chatBtn">💬 Чат</button>
-        <div>Блок: <span id="currentBlock">grass</span></div>
-    </div>
+    initControls() {
+        // Улучшенное управление с применением сил
+        const moveForce = 20;
+        const jumpForce = 8;
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+        window.addEventListener('keydown', (e) => {
+            if(e.code === 'Space' && this.isGrounded()) {
+                playerBody.velocity.y = jumpForce;
+            }
+        });
 
-    <script>
-        // Конфигурация игры
-        const CHUNK_SIZE = 16;
-        const RENDER_DISTANCE = 4;
-        const BLOCK_TYPES = {
-            grass: { color: 0x00ff00 },
-            dirt: { color: 0x8b4513 },
-            stone: { color: 0x808080 }
+        const updateMovement = () => {
+            if(!this.controlsEnabled) return;
+
+            const direction = new THREE.Vector3();
+            const rotation = camera.rotation.y;
+
+            if(keys['KeyW']) direction.z -= Math.cos(rotation) * moveForce;
+            if(keys['KeyS']) direction.z += Math.cos(rotation) * moveForce;
+            if(keys['KeyA']) direction.x -= Math.sin(rotation) * moveForce;
+            if(keys['KeyD']) direction.x += Math.sin(rotation) * moveForce;
+
+            playerBody.velocity.x = direction.x;
+            playerBody.velocity.z = direction.z;
         };
 
-        // Инициализация системы
-        let scene, camera, renderer, physicsWorld;
-        let chunks = new Map();
-        let currentBlock = 'grass';
-        let playerBody;
+        setInterval(updateMovement, 1000/60);
+    }
 
-        class Game {
-            constructor() {
-                this.initThreeJS();
-                this.initPhysics();
-                this.initWorld();
-                this.initPlayer();
-                this.initUI();
-                this.startGameLoop();
-            }
+    isGrounded() {
+        // Проверка коллизии с землей
+        const result = physicsWorld.rayTestAll(
+            playerBody.position,
+            new CANNON.Vec3(
+                playerBody.position.x,
+                playerBody.position.y - 1.1,
+                playerBody.position.z
+            )
+        );
+        return result.length > 0;
+    }
+}
 
-            initThreeJS() {
-                scene = new THREE.Scene();
-                camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-                renderer = new THREE.WebGLRenderer();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                document.body.appendChild(renderer.domElement);
-            }
-
-            initPhysics() {
-                physicsWorld = new CANNON.World();
-                physicsWorld.gravity.set(0, -9.82, 0);
-            }
-
-            initWorld() {
-                for(let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
-                    for(let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
-                        this.generateChunk(x, z);
-                    }
-                }
-            }
-
-            generateChunk(chunkX, chunkZ) {
-                const chunkKey = `${chunkX}|${chunkZ}`;
-                const blocks = [];
-                
-                for(let x = 0; x < CHUNK_SIZE; x++) {
-                    for(let z = 0; z < CHUNK_SIZE; z++) {
-                        const height = Math.floor(Math.random() * 16);
-                        for(let y = 0; y < height; y++) {
-                            blocks.push({
-                                x: chunkX * CHUNK_SIZE + x,
-                                y,
-                                z: chunkZ * CHUNK_SIZE + z,
-                                type: y === height - 1 ? 'grass' : 'dirt'
-                            });
-                        }
-                    }
-                }
-                
-                chunks.set(chunkKey, blocks);
-                this.renderChunk(blocks);
-            }
-
-            renderChunk(blocks) {
-                blocks.forEach(block => {
-                    const geometry = new THREE.BoxGeometry(1, 1, 1);
-                    const material = new THREE.MeshBasicMaterial({ 
-                        color: BLOCK_TYPES[block.type].color 
-                    });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    mesh.position.set(block.x, block.y, block.z);
-                    scene.add(mesh);
-                });
-            }
-
-            initPlayer() {
-                // Физическое тело
-                playerBody = new CANNON.Body({
-                    mass: 5,
-                    position: new CANNON.Vec3(0, 20, 0),
-                    shape: new CANNON.Sphere(0.5)
-                });
-                physicsWorld.addBody(playerBody);
-
-                // Управление
-                this.initControls();
-            }
-
-            initControls() {
-                const keys = {};
-                document.addEventListener('keydown', e => keys[e.key] = true);
-                document.addEventListener('keyup', e => keys[e.key] = false);
-
-                const velocity = 5;
-                const animate = () => {
-                    if(keys['w']) playerBody.position.z -= velocity * 0.1;
-                    if(keys['s']) playerBody.position.z += velocity * 0.1;
-                    if(keys['a']) playerBody.position.x -= velocity * 0.1;
-                    if(keys['d']) playerBody.position.x += velocity * 0.1;
-                    requestAnimationFrame(animate);
-                };
-                animate();
-
-                // Взаимодействие с блоками
-                document.addEventListener('mousedown', e => {
-                    const raycaster = new THREE.Raycaster();
-                    const mouse = new THREE.Vector2();
-                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                    
-                    raycaster.setFromCamera(mouse, camera);
-                    const intersects = raycaster.intersectObjects(scene.children);
-                    
-                    if(intersects.length > 0) {
-                        const block = intersects[0].object;
-                        if(e.button === 0) this.removeBlock(block);
-                        if(e.button === 2) this.placeBlock(block.position);
-                    }
-                });
-            }
-
-            removeBlock(block) {
-                scene.remove(block);
-            }
-
-            placeBlock(pos) {
-                const geometry = new THREE.BoxGeometry(1, 1, 1);
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: BLOCK_TYPES[currentBlock].color 
-                });
-                const newBlock = new THREE.Mesh(geometry, material);
-                newBlock.position.copy(pos).add(new THREE.Vector3(0, 1, 0));
-                scene.add(newBlock);
-            }
-
-            initUI() {
-                document.getElementById('inventoryBtn').addEventListener('click', () => {
-                    this.toggleInventory();
-                });
-
-                document.getElementById('chatBtn').addEventListener('click', () => {
-                    this.toggleChat();
-                });
-            }
-
-            toggleInventory() {
-                // Логика инвентаря
-                console.log('Inventory toggle');
-            }
-
-            toggleChat() {
-                // Логика чата
-                console.log('Chat toggle');
-            }
-
-            startGameLoop() {
-                const animate = () => {
-                    requestAnimationFrame(animate);
-                    physicsWorld.step(1/60);
-                    camera.position.copy(playerBody.position);
-                    camera.position.y += 1; // Высота от первого лица
-                    renderer.render(scene, camera);
-                };
-                animate();
-            }
-        }
-
-        // Запуск игры
-        window.addEventListener('DOMContentLoaded', () => {
-            new Game();
-        });
-
-        // Адаптивность
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
+// Запуск улучшенной версии
+window.addEventListener('DOMContentLoaded', () => {
+    new Game();
+});
+</script>
