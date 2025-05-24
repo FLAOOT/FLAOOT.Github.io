@@ -1,123 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TeleCraft</title>
+    <script src="https://kaboomjs.com/lib/0.6.0/kaboom.js"></script>
+    <style>
+        body { margin: 0; background: #1a1a1a; }
+        canvas { border: 2px solid #2ecc71; }
+    </style>
+</head>
+<body>
 <script>
-// Улучшенная версия с оптимизациями
-const CHUNK_SIZE = 16;
-const RENDER_DISTANCE = 2; // Уменьшаем дистанцию рендеринга
+kaboom({
+    background: [0, 0, 0], // Чёрный фон как в Telegram
+    width: 800,
+    height: 600
+});
 
-class Game {
-    constructor() {
-        // ... предыдущий код инициализации ...
+// Стиль блоков (цвета как в Telegram)
+const BLOCKS = {
+    "grass": [34, 139, 34],    // Зелёный
+    "dirt": [139, 69, 19],     // Коричневый
+    "stone": [128, 128, 128]   // Серый
+};
 
-        // Оптимизация: объединенная геометрия
-        this.chunkMeshes = new THREE.Group();
-        scene.add(this.chunkMeshes);
-    }
-
-    generateChunk(chunkX, chunkZ) {
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ vertexColors: true });
-        const chunkMesh = new THREE.InstancedMesh(geometry, material, CHUNK_SIZE**3);
-        
-        let i = 0;
-        for(let x = 0; x < CHUNK_SIZE; x++) {
-            for(let z = 0; z < CHUNK_SIZE; z++) {
-                const height = Math.floor(Math.random() * 16);
-                for(let y = 0; y < height; y++) {
-                    const matrix = new THREE.Matrix4().makeTranslation(
-                        chunkX * CHUNK_SIZE + x,
-                        y,
-                        chunkZ * CHUNK_SIZE + z
-                    );
-                    chunkMesh.setMatrixAt(i++, matrix);
-                    
-                    // Добавляем физическое тело для блока
-                    const blockBody = new CANNON.Body({
-                        mass: 0, // Статичное тело
-                        shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
-                        position: new CANNON.Vec3(
-                            chunkX * CHUNK_SIZE + x,
-                            y,
-                            chunkZ * CHUNK_SIZE + z
-                        )
-                    });
-                    physicsWorld.addBody(blockBody);
-                }
-            }
+// Генерация мира (5x5x5)
+const world = [];
+for (let x = 0; x < 5; x++) {
+    world[x] = [];
+    for (let y = 0; y < 5; y++) {
+        world[x][y] = [];
+        for (let z = 0; z < 5; z++) {
+            world[x][y][z] = "grass"; // Первый слой — трава
         }
-        this.chunkMeshes.add(chunkMesh);
-    }
-
-    initPlayer() {
-        // Улучшенная физика игрока
-        playerBody = new CANNON.Body({
-            mass: 5,
-            position: new CANNON.Vec3(0, 20, 0),
-            shape: new CANNON.Sphere(0.4),
-            material: new CANNON.Material(),
-            fixedRotation: true
-        });
-
-        // Настройка трения
-        playerBody.linearDamping = 0.9;
-        physicsWorld.addBody(playerBody);
-
-        // Коллизия с землей
-        const groundMaterial = new CANNON.Material();
-        const playerGroundContact = new CANNON.ContactMaterial(
-            playerBody.material,
-            groundMaterial,
-            {
-                friction: 0.5,
-                restitution: 0
-            }
-        );
-        physicsWorld.addContactMaterial(playerGroundContact);
-    }
-
-    initControls() {
-        // Улучшенное управление с применением сил
-        const moveForce = 20;
-        const jumpForce = 8;
-
-        window.addEventListener('keydown', (e) => {
-            if(e.code === 'Space' && this.isGrounded()) {
-                playerBody.velocity.y = jumpForce;
-            }
-        });
-
-        const updateMovement = () => {
-            if(!this.controlsEnabled) return;
-
-            const direction = new THREE.Vector3();
-            const rotation = camera.rotation.y;
-
-            if(keys['KeyW']) direction.z -= Math.cos(rotation) * moveForce;
-            if(keys['KeyS']) direction.z += Math.cos(rotation) * moveForce;
-            if(keys['KeyA']) direction.x -= Math.sin(rotation) * moveForce;
-            if(keys['KeyD']) direction.x += Math.sin(rotation) * moveForce;
-
-            playerBody.velocity.x = direction.x;
-            playerBody.velocity.z = direction.z;
-        };
-
-        setInterval(updateMovement, 1000/60);
-    }
-
-    isGrounded() {
-        // Проверка коллизии с землей
-        const result = physicsWorld.rayTestAll(
-            playerBody.position,
-            new CANNON.Vec3(
-                playerBody.position.x,
-                playerBody.position.y - 1.1,
-                playerBody.position.z
-            )
-        );
-        return result.length > 0;
     }
 }
 
-// Запуск улучшенной версии
-window.addEventListener('DOMContentLoaded', () => {
-    new Game();
+// Персонаж
+const player = add([
+    pos(400, 300),
+    rect(20, 40),
+    color(0, 191, 255), // Голубой цвет
+    "player"
+]);
+
+// Управление (WASD + пробел)
+onKeyPress("w", () => player.move(0, -10));
+onKeyPress("s", () => player.move(0, 10));
+onKeyPress("a", () => player.move(-10, 0));
+onKeyPress("d", () => player.move(10, 0));
+onKeyPress("space", () => {
+    // Размещение блока (серый квадратик)
+    add([
+        pos(player.pos.x + 20, player.pos.y),
+        rect(20, 20),
+        color(128, 128, 128)
+    ]);
+});
+
+// Интерфейс в стиле Telegram
+add([
+    text("TeleCraft v1.0", { size: 20 }),
+    pos(20, 20),
+    color(0, 255, 0)
+]);
+
+// Панель выбора блоков (справа)
+const blockPanel = add([
+    pos(650, 100),
+    rect(100, 300),
+    color(30, 30, 30)
+]);
+
+let selectedBlock = "grass";
+Object.keys(BLOCKS).forEach((block, i) => {
+    blockPanel.add([
+        pos(10, 10 + i * 60),
+        rect(80, 50),
+        color(...BLOCKS[block]),
+        area(),
+        "block",
+        { type: block }
+    ]);
+
+    blockPanel.onHover("block", (b) => b.color = [255, 255, 255]);
+    blockPanel.onClick("block", (b) => selectedBlock = b.type);
 });
 </script>
+</body>
+</html>
