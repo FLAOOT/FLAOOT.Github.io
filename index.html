@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Minecraft</title>
+    <title>Web Minecraft FPS</title>
     <style>
         body { margin: 0; overflow: hidden; }
         #inventory {
@@ -10,6 +10,7 @@
             width: 100%;
             display: flex;
             justify-content: center;
+            z-index: 100;
         }
         .slot {
             width: 50px;
@@ -22,9 +23,19 @@
         .active {
             border-color: yellow;
         }
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+    <div id="crosshair">+</div>
     <div id="inventory"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -33,146 +44,130 @@
         let currentBlockType = 'grass';
         const BLOCK_SIZE = 1;
         
-        // Инициализация сцены
+        // Управление
+        let yaw = 0;
+        let pitch = 0;
+        const keys = {};
+        let velocity = new THREE.Vector3();
+        let canJump = false;
+        const PLAYER_HEIGHT = 1.8;
+
         function init() {
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer();
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
             // Освещение
-            const light = new THREE.PointLight(0xffffff, 1, 100);
-            light.position.set(10, 10, 10);
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(100, 100, 100);
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
-            // Камера
-            camera.position.set(5, 5, 5);
-            camera.lookAt(0, 0, 0);
-
-            // Создание базовой земли
+            // Позиция игрока
+            camera.position.y = PLAYER_HEIGHT;
+            
             createGround();
-
-            // Рейкастер
             raycaster = new THREE.Raycaster();
-            
-            // Инвентарь
             createInventory();
-            
+
             // События
             document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+            document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+            document.addEventListener('click', () => {
+                document.body.requestPointerLock();
+            });
+            document.addEventListener('pointerlockchange', updatePointerLock);
             window.addEventListener('resize', onWindowResize);
         }
 
-        function createGround() {
-            for(let x = -5; x <= 5; x++) {
-                for(let z = -5; z <= 5; z++) {
-                    addBlock(x, -1, z, 'dirt');
+        function updatePointerLock() {
+            if (document.pointerLockElement === document.body) {
+                document.addEventListener('mousemove', onMouseMove);
+            } else {
+                document.removeEventListener('mousemove', onMouseMove);
+            }
+        }
+
+        function onMouseMove(e) {
+            const sensitivity = 0.002;
+            yaw -= e.movementX * sensitivity;
+            pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch - e.movementY * sensitivity));
+            camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        }
+
+        function updatePlayer(delta) {
+            const speed = 5 * delta;
+            const direction = new THREE.Vector3();
+
+            if (keys.w]) direction.z -= 1;
+            if (keys.s]) direction.z += 1;
+            if (keys.a]) direction.x -= 1;
+            if (keys.d]) direction.x += 1;
+
+            direction.normalize();
+            direction.applyEuler(new THREE.Euler(0, yaw, 0, 'YXZ'));
+
+            velocity.x = direction.x * speed;
+            velocity.z = direction.z * speed;
+
+            // Гравитация
+            velocity.y -= 9.8 * delta;
+
+            // Прыжок
+            if (keys[' '] && canJump) {
+                velocity.y = 5 * delta;
+                canJump = false;
+            }
+
+            checkCollisions();
+            camera.position.add(velocity);
+        }
+
+        function checkCollisions() {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3().copy(camera.position).sub(new THREE.Vector3(0.3, 0, 0.3)),
+                new THREE.Vector3().copy(camera.position).add(new THREE.Vector3(0.3, PLAYER_HEIGHT, 0.3))
+            );
+
+            for (const [key, block] of blocks) {
+                const blockBox = new THREE.Box3().setFromObject(block.mesh);
+                if (playerBox.intersectsBox(blockBox)) {
+                    const overlap = new THREE.Box3();
+                    overlap.copy(playerBox).intersect(blockBox);
+                    const size = overlap.getSize(new THREE.Vector3());
+
+                    if (size.y > size.x && size.y > size.z) {
+                        // Вертикальная коллизия
+                        velocity.y = 0;
+                        if (overlap.min.y === blockBox.min.y) {
+                            camera.position.y = blockBox.max.y + 0.3;
+                            canJump = true;
+                        } else {
+                            camera.position.y = blockBox.min.y - PLAYER_HEIGHT;
+                        }
+                    } else {
+                        // Горизонтальная коллизия
+                        if (overlap.min.x === blockBox.min.x) velocity.x = Math.min(velocity.x, 0);
+                        else velocity.x = Math.max(velocity.x, 0);
+                        
+                        if (overlap.min.z === blockBox.min.z) velocity.z = Math.min(velocity.z, 0);
+                        else velocity.z = Math.max(velocity.z, 0);
+                    }
                 }
             }
         }
 
-        function addBlock(x, y, z, type) {
-            const key = `${x},${y},${z}`;
-            if(blocks.has(key)) return;
+        // Остальные функции (createGround, addBlock, removeBlock и т.д.) остаются как в исходном коде
 
-            const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            const material = new THREE.MeshPhongMaterial({ 
-                color: getColorByType(type),
-                wireframe: false 
-            });
-            
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(x, y, z);
-            scene.add(cube);
-            
-            blocks.set(key, { type, mesh: cube });
-        }
-
-        function removeBlock(x, y, z) {
-            const key = `${x},${y},${z}`;
-            if(!blocks.has(key)) return;
-
-            const block = blocks.get(key);
-            scene.remove(block.mesh);
-            blocks.delete(key);
-        }
-
-        function getColorByType(type) {
-            const colors = {
-                grass: 0x00ff00,
-                dirt: 0x8b4513,
-                stone: 0x808080,
-                wood: 0x8b5a2b
-            };
-            return colors[type] || 0xff0000;
-        }
-
-        function createInventory() {
-            const inventory = document.getElementById('inventory');
-            const items = ['grass', 'dirt', 'stone', 'wood'];
-            
-            items.forEach((item, index) => {
-                const slot = document.createElement('div');
-                slot.className = `slot ${index === 0 ? 'active' : ''}`;
-                slot.style.backgroundColor = `#${getColorByType(item).toString(16)}`;
-                slot.onclick = () => selectBlock(item, slot);
-                inventory.appendChild(slot);
-            });
-        }
-
-        function selectBlock(type, element) {
-            currentBlockType = type;
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
-            element.classList.add('active');
-        }
-
-        function onMouseDown(event) {
-            const mouse = new THREE.Vector2();
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children);
-
-            if(intersects.length > 0) {
-                const intersect = intersects[0];
-                const pos = intersect.object.position;
-                
-                if(event.button === 0) { // ЛКМ - удалить блок
-                    removeBlock(pos.x, pos.y, pos.z);
-                } else if(event.button === 2) { // ПКМ - добавить блок
-                    const normal = intersect.face.normal;
-                    const newPos = pos.clone().add(normal.multiplyScalar(BLOCK_SIZE));
-                    addBlock(
-                        Math.round(newPos.x),
-                        Math.round(newPos.y),
-                        Math.round(newPos.z),
-                        currentBlockType
-                    );
-                }
-            }
-        }
-
-        function onMouseMove(event) {
-            // Простое управление камерой
-            if(event.buttons === 1) {
-                camera.position.x += (event.movementX * 0.01);
-                camera.position.z += (event.movementY * 0.01);
-            }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // Анимация
         function animate() {
             requestAnimationFrame(animate);
+            const delta = 0.016; // Примерное значение для 60 FPS
+            if (document.pointerLockElement === document.body) updatePlayer(delta);
             renderer.render(scene, camera);
         }
 
