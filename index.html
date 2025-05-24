@@ -1,90 +1,274 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TeleCraft</title>
-    <script src="https://kaboomjs.com/lib/0.6.0/kaboom.js"></script>
+    <title>Web Minecraft</title>
     <style>
-        body { margin: 0; background: #1a1a1a; }
-        canvas { border: 2px solid #2ecc71; }
+        body { margin: 0; overflow: hidden; }
+        #inventory {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 100;
+        }
+        .slot {
+            width: 64px;
+            height: 64px;
+            border: 2px solid white;
+            margin: 5px;
+            cursor: pointer;
+            background-size: cover;
+        }
+        .active {
+            border-color: yellow;
+        }
+        #blockPointer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: white;
+            transform: translate(-50%, -50%);
+        }
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-<script>
-kaboom({
-    background: [0, 0, 0], // Чёрный фон как в Telegram
-    width: 800,
-    height: 600
-});
+    <div id="inventory"></div>
+    <div id="blockPointer"></div>
+    <button id="startButton">Start Game</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script>
+        let scene, camera, renderer, controls;
+        let blocks = new Map();
+        let currentBlockType = 'grass';
+        const BLOCK_SIZE = 1;
+        const MOVEMENT_SPEED = 0.1;
+        const MOUSE_SENSITIVITY = 0.002;
+        let moveState = { forward: false, backward: false, left: false, right: false };
+        
+        // Текстуры
+        const textures = {
+            grass: 'https://i.imgur.com/6YbD6qQ.png',
+            dirt: 'https://i.imgur.com/7Q6MZe1.png',
+            stone: 'https://i.imgur.com/3RXjJ6z.png',
+            wood: 'https://i.imgur.com/4n1BfT5.png'
+        };
 
-// Стиль блоков (цвета как в Telegram)
-const BLOCKS = {
-    "grass": [34, 139, 34],    // Зелёный
-    "dirt": [139, 69, 19],     // Коричневый
-    "stone": [128, 128, 128]   // Серый
-};
+        // Инициализация
+        async function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-// Генерация мира (5x5x5)
-const world = [];
-for (let x = 0; x < 5; x++) {
-    world[x] = [];
-    for (let y = 0; y < 5; y++) {
-        world[x][y] = [];
-        for (let z = 0; z < 5; z++) {
-            world[x][y][z] = "grass"; // Первый слой — трава
+            // Освещение
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(100, 100, 100);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Загрузка текстур
+            const textureLoader = new THREE.TextureLoader();
+            for(let type in textures) {
+                textures[type] = await new Promise(resolve => 
+                    textureLoader.load(textures[type], resolve)
+                );
+            }
+
+            // Загрузка мира
+            loadWorld();
+
+            // Управление
+            setupControls();
+            setupInventory();
+            animate();
         }
-    }
-}
 
-// Персонаж
-const player = add([
-    pos(400, 300),
-    rect(20, 40),
-    color(0, 191, 255), // Голубой цвет
-    "player"
-]);
+        function setupControls() {
+            // Pointer Lock
+            controls = new THREE.PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
+            camera.position.y = 2;
 
-// Управление (WASD + пробел)
-onKeyPress("w", () => player.move(0, -10));
-onKeyPress("s", () => player.move(0, 10));
-onKeyPress("a", () => player.move(-10, 0));
-onKeyPress("d", () => player.move(10, 0));
-onKeyPress("space", () => {
-    // Размещение блока (серый квадратик)
-    add([
-        pos(player.pos.x + 20, player.pos.y),
-        rect(20, 20),
-        color(128, 128, 128)
-    ]);
-});
+            // Обработчики событий
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('resize', onWindowResize);
 
-// Интерфейс в стиле Telegram
-add([
-    text("TeleCraft v1.0", { size: 20 }),
-    pos(20, 20),
-    color(0, 255, 0)
-]);
+            // Кнопка старта
+            document.getElementById('startButton').addEventListener('click', () => {
+                controls.lock();
+                document.getElementById('startButton').style.display = 'none';
+            });
+        }
 
-// Панель выбора блоков (справа)
-const blockPanel = add([
-    pos(650, 100),
-    rect(100, 300),
-    color(30, 30, 30)
-]);
+        function addBlock(x, y, z, type) {
+            const key = `${x},${y},${z}`;
+            if(blocks.has(key)) return;
 
-let selectedBlock = "grass";
-Object.keys(BLOCKS).forEach((block, i) => {
-    blockPanel.add([
-        pos(10, 10 + i * 60),
-        rect(80, 50),
-        color(...BLOCKS[block]),
-        area(),
-        "block",
-        { type: block }
-    ]);
+            const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            const materials = Array(6).fill(new THREE.MeshStandardMaterial({ 
+                map: textures[type]
+            }));
 
-    blockPanel.onHover("block", (b) => b.color = [255, 255, 255]);
-    blockPanel.onClick("block", (b) => selectedBlock = b.type);
-});
-</script>
+            const cube = new THREE.Mesh(geometry, materials);
+            cube.position.set(x, y, z);
+            scene.add(cube);
+            
+            blocks.set(key, { type, mesh: cube });
+            saveWorld();
+        }
+
+        function removeBlock(x, y, z) {
+            const key = `${x},${y},${z}`;
+            if(!blocks.has(key)) return;
+
+            const block = blocks.get(key);
+            scene.remove(block.mesh);
+            blocks.delete(key);
+            saveWorld();
+        }
+
+        function saveWorld() {
+            const saveData = Array.from(blocks).map(([key, value]) => ({
+                pos: key.split(',').map(Number),
+                type: value.type
+            }));
+            localStorage.setItem('minecraftWorld', JSON.stringify(saveData));
+        }
+
+        function loadWorld() {
+            const saveData = JSON.parse(localStorage.getItem('minecraftWorld') || '[]');
+            saveData.forEach(({pos, type}) => {
+                addBlock(pos[0], pos[1], pos[2], type);
+            });
+        }
+
+        function setupInventory() {
+            const inventory = document.getElementById('inventory');
+            const items = ['grass', 'dirt', 'stone', 'wood'];
+            
+            items.forEach((item, index) => {
+                const slot = document.createElement('div');
+                slot.className = `slot ${index === 0 ? 'active' : ''}`;
+                slot.style.backgroundImage = `url(${textures[item].image.src})`;
+                slot.onclick = () => selectBlock(item, slot);
+                inventory.appendChild(slot);
+            });
+        }
+
+        function selectBlock(type, element) {
+            currentBlockType = type;
+            document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function onKeyDown(event) {
+            switch(event.key.toLowerCase()) {
+                case 'w': moveState.forward = true; break;
+                case 's': moveState.backward = true; break;
+                case 'a': moveState.left = true; break;
+                case 'd': moveState.right = true; break;
+            }
+        }
+
+        function onKeyUp(event) {
+            switch(event.key.toLowerCase()) {
+                case 'w': moveState.forward = false; break;
+                case 's': moveState.backward = false; break;
+                case 'a': moveState.left = false; break;
+                case 'd': moveState.right = false; break;
+            }
+        }
+
+        function onMouseDown(event) {
+            if(!controls.isLocked) return;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(), camera);
+            
+            const intersects = raycaster.intersectObjects(scene.children);
+            if(intersects.length > 0) {
+                const intersect = intersects[0];
+                const pos = intersect.object.position;
+                
+                if(event.button === 0) {
+                    removeBlock(pos.x, pos.y, pos.z);
+                } else if(event.button === 2) {
+                    const normal = intersect.face.normal;
+                    const newPos = pos.clone().add(normal.multiplyScalar(BLOCK_SIZE));
+                    addBlock(
+                        Math.round(newPos.x),
+                        Math.round(newPos.y),
+                        Math.round(newPos.z),
+                        currentBlockType
+                    );
+                }
+            }
+        }
+
+        function onMouseMove(event) {
+            if(controls.isLocked) {
+                camera.rotation.y -= event.movementX * MOUSE_SENSITIVITY;
+                camera.rotation.x -= event.movementY * MOUSE_SENSITIVITY;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        }
+
+        function updatePlayerPosition() {
+            const direction = new THREE.Vector3();
+            const rotation = camera.rotation.y;
+
+            if(moveState.forward) direction.z -= Math.cos(rotation);
+            if(moveState.backward) direction.z += Math.cos(rotation);
+            if(moveState.left) direction.x -= Math.sin(rotation);
+            if(moveState.right) direction.x += Math.sin(rotation);
+
+            direction.normalize();
+            camera.position.addScaledVector(direction, MOVEMENT_SPEED);
+            
+            // Простая проверка коллизий
+            const playerPos = camera.position.clone();
+            playerPos.y -= 1;
+            for(let [key] of blocks) {
+                const [x, y, z] = key.split(',').map(Number);
+                const blockPos = new THREE.Vector3(x, y, z);
+                if(playerPos.distanceTo(blockPos) < 1.2) {
+                    camera.position.subScaledVector(direction, MOVEMENT_SPEED);
+                    break;
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(controls.isLocked) updatePlayerPosition();
+            renderer.render(scene, camera);
+        }
+
+        init();
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+    </script>
 </body>
 </html>
