@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>T</title>
+    <title>lolt</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -341,51 +341,6 @@
             currentBlockType = type;
         }
 
-        function checkCollisions(newPos) {
-            const playerBox = new THREE.Box3(
-                new THREE.Vector3(
-                    newPos.x - player.radius,
-                    newPos.y,
-                    newPos.z - player.radius
-                ),
-                new THREE.Vector3(
-                    newPos.x + player.radius,
-                    newPos.y + player.height,
-                    newPos.z + player.radius
-                )
-            );
-
-            let collided = false;
-            blocks.forEach(block => {
-                const blockBox = new THREE.Box3().setFromObject(block);
-                const intersection = playerBox.intersect(blockBox);
-                if(!intersection.isEmpty()) {
-                    collided = true;
-                    const overlap = intersection.getSize(new THREE.Vector3());
-                    
-                    if(overlap.y > overlap.x && overlap.y > overlap.z) {
-                        velocity.y = 0;
-                        if(playerBox.min.y < blockBox.max.y) {
-                            newPos.y = blockBox.max.y;
-                            canJump = true;
-                        }
-                    } else {
-                        if(Math.abs(overlap.x) > Math.abs(overlap.z)) {
-                            newPos.x = player.position.x;
-                        } else {
-                            newPos.z = player.position.z;
-                        }
-                    }
-                }
-            });
-            return collided ? newPos : newPos;
-        }
-
-        function scheduleSave() {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveWorld, 1000);
-        }
-
         function updatePlayer(delta) {
             if(isFlying) {
                 velocity.set(0, 0, 0);
@@ -399,17 +354,23 @@
                 if(keys[' ']) direction.y += 1;
                 if(keys.shift) direction.y -= 1;
 
-                direction.normalize();
-                direction.applyEuler(new THREE.Euler(0, yaw, 0));
-                
-                player.position.add(direction.multiplyScalar(moveSpeed * delta));
+                if(direction.length() > 0) {
+                    direction.normalize();
+                    direction.applyEuler(new THREE.Euler(0, yaw, 0));
+                    player.position.add(direction.multiplyScalar(moveSpeed * delta));
+                }
             }
 
             player.position.x = THREE.MathUtils.clamp(player.position.x, -worldSize, worldSize);
-            player.position.y = THREE.MathUtils.clamp(player.position.y, -64, 256);
+            player.position.y = THREE.MathUtils.clamp(player.position.y, 10, 256); // Фикс минимальной высоты
             player.position.z = THREE.MathUtils.clamp(player.position.z, -worldSize, worldSize);
 
             camera.position.copy(player.position.add(new THREE.Vector3(0, player.height/2, 0)));
+        }
+
+        function scheduleSave() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveWorld, 1000);
         }
 
         function saveWorld() {
@@ -438,19 +399,20 @@
         }
 
         function createGround() {
-            const platformSize = 7;
+            // Стартовая платформа 11x11
+            const platformSize = 11;
             for(let x = -platformSize; x <= platformSize; x++) {
                 for(let z = -platformSize; z <= platformSize; z++) {
-                    addBlock(x, 10, z, 'stone');
-                    for(let y = 9; y >= 5; y--) {
+                    for(let y = 10; y >= 8; y--) {
                         addBlock(x, y, z, 'stone');
                     }
                 }
             }
 
+            // Основной мир
             for(let x = -worldSize; x <= worldSize; x++) {
                 for(let z = -worldSize; z <= worldSize; z++) {
-                    for(let y = 4; y >= -3; y--) {
+                    for(let y = 7; y >= -3; y--) {
                         addBlock(x, y, z, y >= 0 ? 'grass' : 'dirt');
                     }
                 }
