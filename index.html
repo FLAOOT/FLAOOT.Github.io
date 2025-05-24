@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Minecraft FPS</title>
+    <title>tmeft</title>
     <style>
         body { margin: 0; overflow: hidden; }
         #crosshair {
@@ -53,6 +53,7 @@
             stone: new THREE.MeshPhongMaterial({ color: 0x808080 }),
             wood: new THREE.MeshPhongMaterial({ color: 0x8B5A2B })
         };
+        let keys = {};
 
         function init() {
             // Инициализация сцены
@@ -74,10 +75,12 @@
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
+            // Raycaster
+            raycaster = new THREE.Raycaster();
+
             // Генерация мира
             createGround();
             initInventory();
-            raycaster = new THREE.Raycaster();
 
             // Управление
             document.addEventListener('click', () => document.body.requestPointerLock());
@@ -117,7 +120,6 @@
         }
 
         function onKeyDown(e) {
-            if(e.key === 'Control') return; // Для предотвращения масштабирования
             keys[e.key.toLowerCase()] = true;
         }
 
@@ -125,7 +127,6 @@
             keys[e.key.toLowerCase()] = false;
         }
 
-        let keys = {};
         function animate() {
             requestAnimationFrame(animate);
             
@@ -134,12 +135,12 @@
             const direction = new THREE.Vector3();
             
             if(document.pointerLockElement === document.body) {
-                if(keys.w]) direction.z -= 1;
-                if(keys.s]) direction.z += 1;
-                if(keys.a]) direction.x -= 1;
-                if(keys.d]) direction.x += 1;
+                if(keys['w']) direction.z -= 1;
+                if(keys['s']) direction.z += 1;
+                if(keys['a']) direction.x -= 1;
+                if(keys['d']) direction.x += 1;
                 if(keys[' ']) camera.position.y += moveSpeed * delta; // Вверх
-                if(keys.shift]) camera.position.y -= moveSpeed * delta; // Вниз
+                if(keys['shift']) camera.position.y -= moveSpeed * delta; // Вниз
 
                 direction.normalize();
                 direction.applyEuler(new THREE.Euler(0, yaw, 0));
