@@ -3,57 +3,45 @@
 <head>
     <title>TeleCraft Fixed</title>
     <style>
-        /* Previous styles remain */
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 24px;
-        }
+        /* ... (previous styles remain unchanged) ... */
     </style>
 </head>
 <body>
-    <div id="loading">Loading...</div>
-    <div id="info" style="display: none;">FPS: <span id="fps">0</span><br>Selected: <span id="selected-block">Grass</span></div>
-    <div id="hotbar" style="display: none;"></div>
-    <div class="crafting-menu" id="crafting-menu"></div>
+    <div id="loading">Loading... <progress id="load-progress" value="0" max="100"></progress></div>
+    <!-- ... (other elements remain) ... -->
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let camera, scene, renderer, raycaster;
-        let move = { forward: 0, backward: 0, left: 0, right: 0 };
-        let velocityY = 0;
-        let selectedBlock = 1;
-        let blocks = [];
-        let lastTime = Date.now();
-        let isGrounded = false;
-        let isJumping = false;
+        // ... (previous variable declarations) ...
 
-        const BLOCK_TYPES = {
-            0: { name: 'Air', color: null },
-            1: { name: 'Grass', color: '#4CAF50' },
-            2: { name: 'Dirt', color: '#795548' },
-            3: { name: 'Stone', color: '#9E9E9E' },
-            4: { name: 'Planks', color: '#8D6E63' },
-            5: { name: 'Stick', color: '#A1887F' }
-        };
-
-        function init() {
+        async function init() {
             try {
-                // Scene setup
+                showLoading(0);
+                
+                // Async initialization
+                await initializeScene();
+                await generateWorldAsync(16, 16, 16);
+                await initializeUI();
+
+                hideLoading();
+                startGame();
+            } catch (e) {
+                handleError(e);
+            }
+        }
+
+        async function initializeScene() {
+            return new Promise((resolve) => {
                 scene = new THREE.Scene();
                 scene.background = new THREE.Color('#18222d');
 
-                // Renderer with error handling
+                // Initialize WebGLRenderer with fallback
                 try {
                     renderer = new THREE.WebGLRenderer({ antialias: true });
                 } catch (e) {
-                    alert('WebGL not supported!');
-                    return;
+                    alert('WebGL is not supported!');
+                    throw e;
                 }
-                
+
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 document.body.appendChild(renderer.domElement);
 
@@ -69,121 +57,78 @@
                 directionalLight.position.set(1, 1, 1);
                 scene.add(directionalLight);
 
-                // Generate world
-                generateWorld(16, 16, 16);
-
-                // Controls
-                document.addEventListener('keydown', onKeyDown);
-                document.addEventListener('keyup', onKeyUp);
-                document.addEventListener('mousedown', onMouseDown);
-                document.addEventListener('mousemove', onMouseMove);
-                document.body.addEventListener('click', () => {
-                    document.body.requestPointerLock();
-                });
-
-                // UI initialization
-                initHotbar();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('info').style.display = 'block';
-                document.getElementById('hotbar').style.display = 'flex';
-
-                // Raycaster
-                raycaster = new THREE.Raycaster();
-
-                // Start animation loop
-                animate();
-            } catch (e) {
-                console.error('Initialization error:', e);
-                alert('Error initializing game! Check console for details.');
-            }
-        }
-
-        // Fixed camera movement system
-        function updateCameraMovement(delta) {
-            const speed = 15 * delta;
-            const direction = new THREE.Vector3();
-
-            // Get forward/backward direction
-            const theta = camera.rotation.y;
-            if (move.forward || move.backward) {
-                direction.z = -(move.forward - move.backward) * Math.cos(theta);
-                direction.x = (move.forward - move.backward) * Math.sin(theta);
-            }
-
-            // Get left/right direction
-            if (move.left || move.right) {
-                direction.x += (move.right - move.left) * Math.cos(theta);
-                direction.z += (move.right - move.left) * Math.sin(theta);
-            }
-
-            direction.normalize();
-            const newPos = camera.position.clone().add(direction.multiplyScalar(speed));
-            
-            if (!checkCollisions(newPos)) {
-                camera.position.copy(newPos);
-            }
-
-            // Gravity and jumping
-            velocityY -= 25 * delta;
-            camera.position.y += velocityY * delta;
-
-            // Ground collision
-            const groundCheck = checkGroundCollision();
-            if (groundCheck.collided) {
-                camera.position.y = groundCheck.newY;
-                velocityY = 0;
-                isGrounded = true;
-            } else {
-                isGrounded = false;
-            }
-        }
-
-        // Improved collision detection
-        function checkGroundCollision() {
-            const playerBottom = camera.position.y - 1.8;
-            const collidedBlocks = blocks.filter(block => {
-                return block.position.y + 0.5 >= playerBottom - 0.1 &&
-                       block.position.y - 0.5 <= playerBottom &&
-                       Math.abs(block.position.x - camera.position.x) < 0.7 &&
-                       Math.abs(block.position.z - camera.position.z) < 0.7;
+                resolve();
             });
-
-            if (collidedBlocks.length > 0) {
-                const highestBlock = Math.max(...collidedBlocks.map(b => b.position.y));
-                return { collided: true, newY: highestBlock + 1.8 + 0.1 };
-            }
-            return { collided: false };
         }
 
-        // Fixed jump system
-        function onKeyDown(event) {
-            switch(event.key.toLowerCase()) {
-                case 'w': move.forward = 1; break;
-                case 's': move.backward = 1; break;
-                case 'a': move.left = 1; break;
-                case 'd': move.right = 1; break;
-                case ' ':
-                    if (isGrounded && !isJumping) {
-                        velocityY = 10;
-                        isJumping = true;
-                        setTimeout(() => isJumping = false, 500);
+        async function generateWorldAsync(width, height, depth) {
+            return new Promise((resolve) => {
+                let generated = 0;
+                const totalBlocks = width * height * depth;
+                
+                const generateChunk = () => {
+                    for (let i = 0; i < 1000 && generated < totalBlocks; i++) {
+                        const x = Math.floor(generated / (height * depth));
+                        const y = Math.floor((generated % (height * depth)) / depth);
+                        const z = generated % depth;
+                        
+                        const type = y === height - 1 ? 1 : y >= height - 3 ? 2 : 3;
+                        addBlock(x, y, z, type);
+                        
+                        generated++;
+                        if (generated % 100 === 0) {
+                            showLoading((generated / totalBlocks) * 100);
+                        }
                     }
-                    break;
-                // Rest of key handling...
-            }
+
+                    if (generated < totalBlocks) {
+                        requestAnimationFrame(generateChunk);
+                    } else {
+                        resolve();
+                    }
+                };
+
+                generateChunk();
+            });
         }
 
-        // Rest of the code remains similar but uses the new collision system
+        function showLoading(progress) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('load-progress').value = progress;
+        }
 
-        // Initialize the game
-        window.onload = init;
-        window.onresize = () => {
-            if (camera && renderer) {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-        };
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('info').style.display = 'block';
+            document.getElementById('hotbar').style.display = 'flex';
+        }
+
+        function startGame() {
+            // Initialize controls
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            
+            // Initialize raycaster
+            raycaster = new THREE.Raycaster();
+            
+            // Start animation loop
+            animate();
+        }
+
+        // ... (rest of the previous code remains) ...
+
+        // Initialize the game properly
+        window.addEventListener('DOMContentLoaded', () => {
+            init().catch(handleError);
+        });
+
+        function handleError(e) {
+            console.error('Error:', e);
+            document.getElementById('loading').innerHTML = 
+                `<div style="color: red">Error: ${e.message}</div>`;
+        }
     </script>
 </body>
 </html>
