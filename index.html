@@ -1,60 +1,128 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Advanced Minecraft</title>
+    <title>TeleCraft</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden;
+            background: #0f0f0f;
+        }
+
         #crosshair {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 24px;
             pointer-events: none;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
         }
+
         #hotbar {
             position: fixed;
             bottom: 20px;
             width: 100%;
             display: flex;
             justify-content: center;
-            gap: 5px;
-        }
-        #inventory {
-            position: fixed;
-            bottom: 20px;
-            width: 100%;
-            display: none;
-            justify-content: center;
-            gap: 5px;
+            gap: 8px;
+            padding: 0 10px;
+            max-width: 90%;
             flex-wrap: wrap;
-            padding: 10px;
-            background: rgba(0,0,0,0.7);
         }
+
         .slot {
-            width: 40px;
-            height: 40px;
-            border: 2px solid #555;
+            width: 48px;
+            height: 48px;
+            border: 2px solid #3e3e3e;
+            border-radius: 8px;
+            background: #2a2a2a;
             cursor: pointer;
-            background-size: cover;
             position: relative;
+            transition: all 0.1s ease;
         }
+
+        .slot:hover {
+            transform: scale(1.1);
+        }
+
         .active {
-            border-color: #ff0;
-            box-shadow: 0 0 10px #ff0;
+            border-color: #2ea6ff;
+            box-shadow: 0 0 10px rgba(46, 166, 255, 0.5);
+        }
+
+        .block-preview {
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        #menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(16, 16, 16, 0.95);
+            padding: 24px;
+            border-radius: 16px;
+            color: white;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        .menu-button {
+            background: #2a2a2a;
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .menu-button:hover {
+            background: #3e3e3e;
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 16px;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
     <div id="crosshair">+</div>
     <div id="hotbar"></div>
-    <div id="inventory"></div>
+    <div id="menu">
+        <h2 style="text-align: center; margin-bottom: 16px;">TeleCraft Menu</h2>
+        <button class="menu-button" onclick="toggleMenu()">Продолжить</button>
+        <button class="menu-button" onclick="saveWorld()">Сохранить мир</button>
+        <button class="menu-button" onclick="showDebugInfo()">Информация</button>
+        <button class="menu-button" style="margin-top: 20px;" onclick="window.close()">Выход</button>
+    </div>
+    <div id="status">Режим: Креативный</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         const clock = new THREE.Clock();
         let scene, camera, renderer, raycaster;
-        let moveSpeed = 5;
+        let moveSpeed = 8;
         let lookSpeed = 0.002;
         let yaw = Math.PI;
         let pitch = 0;
@@ -63,18 +131,29 @@
         let currentBlockType = 'grass';
         let velocity = new THREE.Vector3();
         let canJump = false;
-        const GRAVITY = 30;
-        let inventoryVisible = false;
+        let isFlying = true;
+        let worldSize = 50;
+        const visibleBlocks = new Set();
 
         const blockMaterials = {
-            grass: new THREE.MeshPhongMaterial({ color: 0x00ff00 }),
-            dirt: new THREE.MeshPhongMaterial({ color: 0x8B4513 }),
+            grass: new THREE.MeshPhongMaterial({ color: 0x50C878 }),
+            dirt: new THREE.MeshPhongMaterial({ color: 0x806040 }),
             stone: new THREE.MeshPhongMaterial({ color: 0x808080 }),
             wood: new THREE.MeshPhongMaterial({ color: 0x8B5A2B }),
             glass: new THREE.MeshStandardMaterial({ 
-                color: 0x00ffff, 
+                color: 0x80C0FF, 
                 transparent: true, 
-                opacity: 0.7 
+                opacity: 0.7,
+                depthWrite: false
+            }),
+            brick: new THREE.MeshPhongMaterial({ color: 0xB22222 }),
+            sand: new THREE.MeshPhongMaterial({ color: 0xF4A460 }),
+            gold: new THREE.MeshPhongMaterial({ color: 0xFFD700 }),
+            leaves: new THREE.MeshStandardMaterial({
+                color: 0x228B22,
+                transparent: true,
+                opacity: 0.8,
+                depthWrite: false
             })
         };
 
@@ -82,7 +161,8 @@
             constructor() {
                 this.height = 1.8;
                 this.radius = 0.3;
-                this.position = new THREE.Vector3(0, 5, 0);
+                this.position = new THREE.Vector3(0, 20, 0);
+                this.flySpeed = 8;
             }
         }
 
@@ -100,7 +180,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Освещение
             const light = new THREE.DirectionalLight(0xffffff, 1);
             light.position.set(100, 100, 100);
             scene.add(light);
@@ -110,7 +189,6 @@
             loadWorld();
             initInventory();
 
-            // События
             document.addEventListener('click', () => document.body.requestPointerLock());
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('keydown', onKeyDown);
@@ -122,6 +200,16 @@
             animate();
         }
 
+        function toggleMenu() {
+            const menu = document.getElementById('menu');
+            menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+            document.exitPointerLock();
+        }
+
+        function showDebugInfo() {
+            alert(`Позиция игрока:\nX: ${player.position.x.toFixed(1)}\nY: ${player.position.y.toFixed(1)}\nZ: ${player.position.z.toFixed(1)}`);
+        }
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -130,39 +218,24 @@
 
         function initInventory() {
             const hotbar = document.getElementById('hotbar');
-            const inventory = document.getElementById('inventory');
-            const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'glass'];
+            const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'glass', 'brick', 'sand', 'gold', 'leaves'];
             
-            // Горячая панель
             blockTypes.forEach((type, i) => {
-                const slot = createSlot(type, i);
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.innerHTML = `
+                    <div class="block-preview" style="background: #${blockMaterials[type].color.getHexString()}"></div>
+                    <div style="position: absolute; bottom: 2px; right: 4px; color: white; font-size: 12px">${i + 1}</div>
+                `;
+                slot.dataset.type = type;
+                slot.onclick = () => selectSlot(slot, type);
                 hotbar.appendChild(slot);
             });
 
-            // Полный инвентарь
-            for(let i = 0; i < 24; i++) {
-                const slot = createSlot(i < blockTypes.length ? blockTypes[i] : null, i);
-                inventory.appendChild(slot);
-            }
-        }
-
-        function createSlot(type, index) {
-            const slot = document.createElement('div');
-            slot.className = 'slot';
-            if(type) {
-                slot.style.backgroundColor = `#${blockMaterials[type].color.getHexString()}`;
-                slot.dataset.type = type;
-            }
-            slot.onclick = () => selectSlot(slot, type);
-            
-            if(index < 8) {
-                slot.innerHTML = `<div style="color:white;position:absolute;bottom:0;right:2px">${index + 1}</div>`;
-            }
-            return slot;
+            document.querySelector('.slot').classList.add('active');
         }
 
         function selectSlot(slot, type) {
-            if(!type) return;
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
             slot.classList.add('active');
             currentBlockType = type;
@@ -208,8 +281,13 @@
         }
 
         function updatePlayer(delta) {
-            velocity.y -= GRAVITY * delta;
-            
+            if(isFlying) {
+                velocity.set(0, 0, 0);
+                canJump = true;
+            } else {
+                velocity.y -= 9.8 * delta;
+            }
+
             const direction = new THREE.Vector3();
             if(keys['w']) direction.z -= 1;
             if(keys['s']) direction.z += 1;
@@ -219,23 +297,27 @@
             direction.normalize();
             direction.applyEuler(new THREE.Euler(0, yaw, 0));
             
-            const newPos = player.position.clone()
-                .add(direction.multiplyScalar(moveSpeed * delta))
-                .add(velocity.clone().multiplyScalar(delta));
-
-            const finalPos = checkCollisions(newPos);
-            player.position.copy(finalPos);
-            camera.position.copy(finalPos.add(new THREE.Vector3(0, player.height/2, 0)));
-
-            if(keys[' '] && canJump) {
-                velocity.y = 8;
-                canJump = false;
+            if(isFlying) {
+                if(keys[' ']) direction.y += 1;
+                if(keys.shift) direction.y -= 1;
             }
+
+            const moveVector = direction.multiplyScalar(moveSpeed * delta);
+            const newPos = player.position.clone().add(moveVector).add(velocity.multiplyScalar(delta));
+            const finalPos = checkCollisions(newPos);
+
+            player.position.copy(finalPos);
+            player.position.clamp(
+                new THREE.Vector3(-worldSize, -64, -worldSize),
+                new THREE.Vector3(worldSize, 256, worldSize)
+            );
+
+            camera.position.copy(player.position.add(new THREE.Vector3(0, player.height/2, 0)));
         }
 
         function saveWorld() {
             const saveData = [];
-            blocks.forEach((block, key) => {
+            blocks.forEach(block => {
                 saveData.push({
                     x: block.position.x,
                     y: block.position.y,
@@ -243,11 +325,12 @@
                     type: block.userData.type
                 });
             });
-            localStorage.setItem('mcWorld', JSON.stringify(saveData));
+            localStorage.setItem('tcWorld', JSON.stringify(saveData));
+            alert('Мир сохранён!');
         }
 
         function loadWorld() {
-            const saveData = localStorage.getItem('mcWorld');
+            const saveData = localStorage.getItem('tcWorld');
             if(saveData) {
                 JSON.parse(saveData).forEach(block => {
                     addBlock(block.x, block.y, block.z, block.type);
@@ -258,10 +341,12 @@
         }
 
         function createGround() {
-            for(let x = -10; x <= 10; x++) {
-                for(let z = -10; z <= 10; z++) {
+            for(let x = -worldSize; x <= worldSize; x++) {
+                for(let z = -worldSize; z <= worldSize; z++) {
                     addBlock(x, 0, z, 'grass');
-                    addBlock(x, -1, z, 'dirt');
+                    for(let y = -1; y >= -3; y--) {
+                        addBlock(x, y, z, 'dirt');
+                    }
                 }
             }
         }
@@ -300,20 +385,19 @@
             const key = e.key.toLowerCase();
             keys[key] = true;
             
-            if(key >= '1' && key <= '8') {
+            if(key === 'escape') toggleMenu();
+            if(key === 'shift') keys.shift = true;
+            if(key >= '1' && key <= '9') {
                 const index = parseInt(key) - 1;
                 const slot = document.querySelectorAll('.slot')[index];
                 if(slot) selectSlot(slot, slot.dataset.type);
             }
-            
-            if(key === 'e') {
-                inventoryVisible = !inventoryVisible;
-                document.getElementById('inventory').style.display = inventoryVisible ? 'flex' : 'none';
-            }
         }
 
         function onKeyUp(e) {
-            keys[e.key.toLowerCase()] = false;
+            const key = e.key.toLowerCase();
+            keys[key] = false;
+            if(key === 'shift') keys.shift = false;
         }
 
         function onMouseDown(e) {
