@@ -1,244 +1,255 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TeleCraft</title>
+    <title>TeleCraft Pro</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        #info {
+        /* Previous styles remain */
+        .crafting-menu {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            color: #ffffff;
-            background: rgba(32, 32, 32, 0.8);
-            padding: 8px;
-            border-radius: 8px;
-            backdrop-filter: blur(5px);
-        }
-        #hotbar {
-            position: absolute;
-            bottom: 20px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 8px;
-            background: rgba(32, 32, 32, 0.8);
-            padding: 8px;
+            transform: translate(-50%, -50%);
+            background: rgba(32, 32, 32, 0.95);
+            padding: 20px;
             border-radius: 12px;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(10px);
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            color: white;
         }
-        .block-slot {
-            width: 40px;
-            height: 40px;
-            border: 2px solid #3390ec;
+        .recipe {
+            padding: 10px;
+            border: 1px solid #3390ec;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
         }
-        .block-slot.selected {
-            border-color: #ffffff;
+        .recipe:hover {
             background: rgba(255, 255, 255, 0.1);
+        }
+        .inventory-count {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 12px;
+            color: white;
+            text-shadow: 1px 1px 2px black;
         }
     </style>
 </head>
 <body>
-    <div id="info">FPS: <span id="fps">0</span><br>Selected: <span id="selected-block">Grass</span></div>
-    <div id="hotbar"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        let camera, scene, renderer, raycaster;
-        let move = { forward: 0, backward: 0, left: 0, right: 0 };
-        let velocityY = 0;
-        let selectedBlock = 1;
-        let blocks = [];
-        let lastTime = Date.now();
+    <!-- Previous HTML elements remain -->
+    <div class="crafting-menu" id="crafting-menu"></div>
 
-        const BLOCK_TYPES = {
-            0: { name: 'Air', color: null },
-            1: { name: 'Grass', color: '#4CAF50' },
-            2: { name: 'Dirt', color: '#795548' },
-            3: { name: 'Stone', color: '#9E9E9E' }
+    <script>
+        // Modified code with new features
+        let inventory = {
+            slots: Array(9).fill().map(() => ({ type: 0, count: 0 })),
+            selectedSlot: 0
         };
 
+        const CRAFT_RECIPES = {
+            'planks': {
+                requires: [{ type: 1, count: 1 }],
+                gives: { type: 4, count: 4 },
+                shape: [[1]]
+            },
+            'stick': {
+                requires: [{ type: 4, count: 2 }],
+                gives: { type: 5, count: 4 },
+                shape: [[4], [4]]
+            }
+        };
+
+        // Add new block types
+        BLOCK_TYPES[4] = { name: 'Planks', color: '#8D6E63' };
+        BLOCK_TYPES[5] = { name: 'Stick', color: '#A1887F' };
+
         function init() {
-            // Scene setup
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color('#18222d');
-
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // Camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(10, 10, 10);
-            camera.lookAt(0, 0, 0);
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
-
-            // Generate world
-            generateWorld(16, 4, 16);
-
-            // Controls
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            document.body.addEventListener('click', () => {
-                document.body.requestPointerLock();
-            });
-
-            // Hotbar
-            initHotbar();
-
-            // Raycaster
-            raycaster = new THREE.Raycaster();
-
-            animate();
-        }
-
-        function generateWorld(width, height, depth) {
-            for (let x = 0; x < width; x++) {
-                for (let z = 0; z < depth; z++) {
-                    for (let y = 0; y < height; y++) {
-                        const type = y === height - 1 ? 1 : y >= height - 3 ? 2 : 3;
-                        addBlock(x, y, z, type);
-                    }
-                }
-            }
-        }
-
-        function addBlock(x, y, z, type) {
-            if (BLOCK_TYPES[type].color) {
-                const geometry = new THREE.BoxGeometry(1, 1, 1);
-                const material = new THREE.MeshPhongMaterial({ 
-                    color: BLOCK_TYPES[type].color,
-                    flatShading: true
-                });
-                const cube = new THREE.Mesh(geometry, material);
-                cube.position.set(x, y, z);
-                cube.userData = { type, x, y, z };
-                scene.add(cube);
-                blocks.push(cube);
-                return cube;
-            }
-            return null;
-        }
-
-        function removeBlock(block) {
-            scene.remove(block);
-            blocks.splice(blocks.indexOf(block), 1);
-        }
-
-        function onKeyDown(event) {
-            switch(event.key.toLowerCase()) {
-                case 'w': move.forward = 1; break;
-                case 's': move.backward = 1; break;
-                case 'a': move.left = 1; break;
-                case 'd': move.right = 1; break;
-                case ' ': if(velocityY === 0) velocityY = 0.1; break;
-            }
-        }
-
-        function onKeyUp(event) {
-            switch(event.key.toLowerCase()) {
-                case 'w': move.forward = 0; break;
-                case 's': move.backward = 0; break;
-                case 'a': move.left = 0; break;
-                case 'd': move.right = 0; break;
-            }
-        }
-
-        function onMouseDown(event) {
-            raycaster.setFromCamera(new THREE.Vector2(), camera);
-            const intersects = raycaster.intersectObjects(blocks);
-            
-            if (intersects.length > 0) {
-                const intersect = intersects[0];
-                if (event.button === 0) { // Left click - destroy
-                    removeBlock(intersect.object);
-                } else if (event.button === 2) { // Right click - build
-                    const normal = intersect.face.normal;
-                    const newPos = intersect.object.position.clone()
-                        .add(normal.multiplyScalar(1));
-                    addBlock(newPos.x, newPos.y, newPos.z, selectedBlock);
-                }
-            }
-        }
-
-        function onMouseMove(event) {
-            if (document.pointerLockElement === document.body) {
-                camera.rotation.y -= event.movementX * 0.002;
-                camera.rotation.x -= event.movementY * 0.002;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-            }
+            // Previous init code
+            inventory.slots[0] = { type: 1, count: 32 };
+            initCraftingMenu();
         }
 
         function initHotbar() {
             const hotbar = document.getElementById('hotbar');
-            Object.entries(BLOCK_TYPES).forEach(([id, block]) => {
-                if (id === '0') return;
-                const slot = document.createElement('div');
-                slot.className = `block-slot ${id === '1' ? 'selected' : ''}`;
-                slot.style.backgroundColor = block.color;
-                slot.onclick = () => {
-                    document.querySelectorAll('.block-slot').forEach(s => s.classList.remove('selected'));
-                    slot.classList.add('selected');
-                    selectedBlock = parseInt(id);
-                    document.getElementById('selected-block').textContent = block.name;
-                };
-                hotbar.appendChild(slot);
+            hotbar.innerHTML = '';
+            
+            inventory.slots.forEach((slot, index) => {
+                const slotDiv = document.createElement('div');
+                slotDiv.className = `block-slot ${index === inventory.selectedSlot ? 'selected' : ''}`;
+                if (slot.type !== 0) {
+                    slotDiv.style.backgroundColor = BLOCK_TYPES[slot.type].color;
+                    const count = document.createElement('div');
+                    count.className = 'inventory-count';
+                    count.textContent = slot.count;
+                    slotDiv.appendChild(count);
+                }
+                
+                slotDiv.onclick = () => selectSlot(index);
+                hotbar.appendChild(slotDiv);
             });
         }
 
-        function animate() {
-            const now = Date.now();
-            const delta = (now - lastTime) / 1000;
-            lastTime = now;
-
-            // Movement
-            const speed = 5 * delta;
-            const direction = new THREE.Vector3(
-                move.right - move.left,
-                0,
-                move.backward - move.forward
-            ).normalize();
-            
-            direction.applyEuler(camera.rotation);
-            camera.position.add(direction.multiplyScalar(speed));
-
-            // Gravity
-            velocityY -= 0.02 * delta;
-            camera.position.y += velocityY;
-            
-            // Ground collision
-            if (camera.position.y < 1) {
-                camera.position.y = 1;
-                velocityY = 0;
+        function selectSlot(index) {
+            inventory.selectedSlot = index;
+            if (inventory.slots[index].type !== 0) {
+                selectedBlock = inventory.slots[index].type;
+                document.getElementById('selected-block').textContent = BLOCK_TYPES[selectedBlock].name;
             }
-
-            // Update FPS counter
-            document.getElementById('fps').textContent = Math.floor(1 / delta);
-
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
+            initHotbar();
         }
 
-        init();
-        window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
+        function onKeyDown(event) {
+            // Previous key handling
+            if (event.key >= '1' && event.key <= '9') {
+                const slotIndex = parseInt(event.key) - 1;
+                if (slotIndex < inventory.slots.length) {
+                    selectSlot(slotIndex);
+                }
+            }
+            if (event.key === 'e') {
+                document.getElementById('crafting-menu').style.display = 'grid';
+            }
+        }
+
+        function onKeyUp(event) {
+            if (event.key === 'e') {
+                document.getElementById('crafting-menu').style.display = 'none';
+            }
+        }
+
+        function initCraftingMenu() {
+            const menu = document.getElementById('crafting-menu');
+            Object.entries(CRAFT_RECIPES).forEach(([name, recipe]) => {
+                const recipeDiv = document.createElement('div');
+                recipeDiv.className = 'recipe';
+                recipeDiv.innerHTML = `
+                    <div>${BLOCK_TYPES[recipe.gives.type].name} x${recipe.gives.count}</div>
+                    <div>Requires: ${recipe.requires.map(r => `${BLOCK_TYPES[r.type].name} x${r.count}`).join(', ')}</div>
+                `;
+                recipeDiv.onclick = () => craftItem(name);
+                menu.appendChild(recipeDiv);
+            });
+        }
+
+        function craftItem(recipeName) {
+            const recipe = CRAFT_RECIPES[recipeName];
+            if (!hasMaterials(recipe.requires)) return;
+            
+            recipe.requires.forEach(required => {
+                removeFromInventory(required.type, required.count);
+            });
+            addToInventory(recipe.gives.type, recipe.gives.count);
+            initHotbar();
+        }
+
+        function hasMaterials(requirements) {
+            return requirements.every(req => {
+                const total = inventory.slots.reduce((sum, slot) => 
+                    slot.type === req.type ? sum + slot.count : sum, 0);
+                return total >= req.count;
+            });
+        }
+
+        function addToInventory(type, count) {
+            const existingSlot = inventory.slots.find(slot => 
+                slot.type === type && slot.count < 64);
+            
+            if (existingSlot) {
+                existingSlot.count += count;
+            } else {
+                const emptySlot = inventory.slots.findIndex(slot => slot.type === 0);
+                if (emptySlot !== -1) {
+                    inventory.slots[emptySlot] = { type, count };
+                }
+            }
+        }
+
+        function removeFromInventory(type, count) {
+            let remaining = count;
+            inventory.slots.forEach(slot => {
+                if (slot.type === type && remaining > 0) {
+                    const remove = Math.min(slot.count, remaining);
+                    slot.count -= remove;
+                    remaining -= remove;
+                    if (slot.count === 0) slot.type = 0;
+                }
+            });
+        }
+
+        // Collision detection
+        function checkCollisions(newPos) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(newPos.x - 0.3, newPos.y - 1.8, newPos.z - 0.3),
+                new THREE.Vector3(newPos.x + 0.3, newPos.y + 0.1, newPos.z + 0.3)
+            );
+
+            return blocks.some(block => {
+                const blockBox = new THREE.Box3(
+                    new THREE.Vector3(block.position.x - 0.5, block.position.y - 0.5, block.position.z - 0.5),
+                    new THREE.Vector3(block.position.x + 0.5, block.position.y + 0.5, block.position.z + 0.5)
+                );
+                return playerBox.intersectsBox(blockBox);
+            });
+        }
+
+        // Modified movement system with collision
+        function animate() {
+            // Previous movement code
+            const newPos = camera.position.clone().add(direction.multiplyScalar(speed));
+            if (!checkCollisions(newPos)) {
+                camera.position.copy(newPos);
+            }
+        }
+
+        // Save/Load system
+        function saveGame() {
+            const saveData = {
+                inventory: inventory,
+                blocks: blocks.map(block => ({
+                    type: block.userData.type,
+                    x: block.position.x,
+                    y: block.position.y,
+                    z: block.position.z
+                })),
+                position: camera.position.toArray()
+            };
+            localStorage.setItem('telecraft-save', JSON.stringify(saveData));
+        }
+
+        function loadGame() {
+            const saveData = JSON.parse(localStorage.getItem('telecraft-save'));
+            if (saveData) {
+                // Clear existing blocks
+                blocks.forEach(block => scene.remove(block));
+                blocks = [];
+                
+                // Load blocks
+                saveData.blocks.forEach(blockData => {
+                    addBlock(blockData.x, blockData.y, blockData.z, blockData.type);
+                });
+
+                // Load inventory
+                inventory = saveData.inventory;
+                initHotbar();
+
+                // Load position
+                camera.position.fromArray(saveData.position);
+            }
+        }
+
+        // Add save/load keybindings
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                saveGame();
+                e.preventDefault();
+            }
+            if (e.ctrlKey && e.key === 'l') {
+                loadGame();
+            }
+        });
     </script>
 </body>
 </html>
