@@ -1,20 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>tolk</title>
+    <title>telecraft</title>
     <style>
-        :root {
-            --primary-color: #0088cc;
-            --background-color: #f3f4f5;
-            --surface-color: #ffffff;
-            --text-color: #212121;
-        }
-
         body { 
             margin: 0; 
             overflow: hidden; 
             font-family: 'Roboto', sans-serif;
-            background: var(--background-color);
+            background: #f3f4f5;
         }
         
         #menu {
@@ -22,7 +15,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: var(--surface-color);
+            background: white;
             width: 320px;
             border-radius: 14px;
             box-shadow: 0 12px 24px rgba(0,0,0,0.1);
@@ -32,7 +25,7 @@
         }
         
         .menu-title {
-            color: var(--primary-color);
+            color: #0088cc;
             font-size: 24px;
             margin-bottom: 24px;
             font-weight: 500;
@@ -43,7 +36,7 @@
             width: 100%;
             padding: 14px;
             margin: 8px 0;
-            background: var(--primary-color);
+            background: #0088cc;
             color: white;
             border: none;
             border-radius: 8px;
@@ -73,7 +66,7 @@
         }
         
         .hud-button {
-            background: var(--primary-color);
+            background: #0088cc;
             color: white;
             border: none;
             padding: 8px 16px;
@@ -124,15 +117,15 @@
         }
         
         .slot.active {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent);
+            border-color: #0088cc;
+            box-shadow: 0 0 0 2px #0088cc33;
         }
         
         .slot-count {
             position: absolute;
             bottom: 4px;
             right: 4px;
-            background: var(--primary-color);
+            background: #0088cc;
             color: white;
             width: 18px;
             height: 18px;
@@ -141,6 +134,24 @@
             align-items: center;
             justify-content: center;
             font-size: 12px;
+        }
+        
+        .page-controls {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+        }
+        
+        .page-btn {
+            padding: 6px 12px;
+            margin: 0 4px;
+            border-radius: 4px;
+            border: 1px solid #0088cc;
+            background: white;
+            color: #0088cc;
+            cursor: pointer;
         }
         
         .slot-key {
@@ -152,70 +163,6 @@
             background: rgba(0,0,0,0.5);
             padding: 2px;
             border-radius: 3px;
-        }
-        
-        #quick-menu {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--surface-color);
-            width: 400px;
-            border-radius: 14px;
-            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-            padding: 20px;
-            z-index: 2000;
-            display: none;
-        }
-
-        .menu-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .menu-tab {
-            padding: 10px 20px;
-            border: none;
-            background: #f0f0f0;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-
-        .menu-tab.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .menu-page {
-            display: none;
-        }
-
-        .menu-page.active {
-            display: block;
-        }
-
-        .color-picker {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .color-option {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            cursor: pointer;
-            border: 2px solid transparent;
-        }
-
-        .color-option.selected {
-            border-color: var(--text-color);
-        }
-
-        .save-list {
-            max-height: 200px;
-            overflow-y: auto;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -231,32 +178,9 @@
         <button class="hud-button" onclick="toggleInventory()">🎒 Инвентарь</button>
     </div>
 
-    <div id="quick-menu">
-        <div class="menu-tabs">
-            <button class="menu-tab active" onclick="switchMenuTab('save')">Сохранения</button>
-            <button class="menu-tab" onclick="switchMenuTab('load')">Загрузка</button>
-            <button class="menu-tab" onclick="switchMenuTab('controls')">Управление</button>
-            <button class="menu-tab" onclick="switchMenuTab('interface')">Интерфейс</button>
-        </div>
-
-        <div id="save-page" class="menu-page active">
-            <input type="text" id="save-name" placeholder="Имя сохранения">
-            <button onclick="saveWithName()">Сохранить</button>
-            <div class="save-list" id="save-list"></div>
-        </div>
-
-        <div id="load-page" class="menu-page">
-            <div class="save-list" id="load-list"></div>
-        </div>
-
-        <div id="controls-page" class="menu-page">
-            <div id="controls-list"></div>
-        </div>
-
-        <div id="interface-page" class="menu-page">
-            <h4>Цветовая схема:</h4>
-            <div class="color-picker" id="color-picker"></div>
-        </div>
+    <div class="page-controls">
+        <button class="page-btn" onclick="switchInventoryPage(0)">1</button>
+        <button class="page-btn" onclick="switchInventoryPage(1)">2</button>
     </div>
 
     <div id="crosshair">+</div>
@@ -274,14 +198,6 @@
         const clock = new THREE.Clock();
         let currentInventoryPage = 0;
         const HOTKEYS = "1234567890qwertyuiopasdf".split('');
-        const KEY_BINDINGS = {
-            moveForward: 'w',
-            moveBackward: 's',
-            moveLeft: 'a',
-            moveRight: 'd',
-            jump: ' ',
-            menu: 'q'
-        };
 
         const COLORS = [
             {name: 'Красный', color: 0xFF0000}, {name: 'Оранжевый', color: 0xFFA500},
@@ -327,6 +243,7 @@
             creativeMode = mode === 'creative';
             document.getElementById('menu').style.display = 'none';
             document.getElementById('hud').style.display = 'flex';
+            document.querySelector('.page-controls').style.display = 'block';
             initGame();
         }
 
@@ -353,7 +270,6 @@
             initInventory();
             initEventListeners();
             loadWorld();
-            initColorPicker();
             animate();
         }
 
@@ -440,6 +356,13 @@
             currentBlockType = type;
         }
 
+        function switchInventoryPage(page) {
+            currentInventoryPage = page;
+            document.querySelectorAll('.inventory-page').forEach(p => 
+                p.classList.remove('active'));
+            document.querySelector(`.inventory-page[data-page="${page}"]`).classList.add('active');
+        }
+
         function saveWorld() {
             const saveData = Array.from(blocks.values()).map(block => ({
                 x: block.position.x,
@@ -486,11 +409,6 @@
             const key = e.key.toLowerCase();
             keys[key] = true;
             
-            if(key === 'q') {
-                toggleQuickMenu();
-                return;
-            }
-            
             if(key === 'e') toggleInventory();
             
             const keyIndex = HOTKEYS.indexOf(key);
@@ -506,13 +424,13 @@
         function updatePlayer(delta) {
             const moveVector = new THREE.Vector3();
             
-            if(keys[KEY_BINDINGS.moveForward]) moveVector.z -= 1;
-            if(keys[KEY_BINDINGS.moveBackward]) moveVector.z += 1;
-            if(keys[KEY_BINDINGS.moveLeft]) moveVector.x -= 1;
-            if(keys[KEY_BINDINGS.moveRight]) moveVector.x += 1;
+            if(keys['w']) moveVector.z -= 1;
+            if(keys['s']) moveVector.z += 1;
+            if(keys['a']) moveVector.x -= 1;
+            if(keys['d']) moveVector.x += 1;
             
             if(creativeMode) {
-                if(keys[KEY_BINDINGS.jump]) moveVector.y += 1;
+                if(keys[' ']) moveVector.y += 1;
                 if(keys['shift']) moveVector.y -= 1;
             }
 
@@ -527,7 +445,7 @@
                 player.velocity.y -= PHYSICS.gravity * delta;
                 moveVector.multiplyScalar(player.onGround ? 1 : PHYSICS.airControl);
                 
-                if(keys[KEY_BINDINGS.jump] && player.onGround) {
+                if(keys[' '] && player.onGround) {
                     player.velocity.y = PHYSICS.jumpForce;
                     player.onGround = false;
                 }
@@ -618,124 +536,6 @@
             }
 
             renderer.render(scene, camera);
-        }
-
-        // Система быстрого меню
-        function toggleQuickMenu() {
-            const menu = document.getElementById('quick-menu');
-            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-            refreshSaveList();
-            refreshControlsList();
-        }
-
-        function switchMenuTab(tabId) {
-            document.querySelectorAll('.menu-page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.menu-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`${tabId}-page`).classList.add('active');
-            document.querySelector(`[onclick="switchMenuTab('${tabId}')"]`).classList.add('active');
-        }
-
-        function saveWithName() {
-            const saveName = document.getElementById('save-name').value;
-            if(!saveName) return;
-            
-            const saveData = {
-                world: Array.from(blocks.values()).map(block => ({
-                    x: block.position.x,
-                    y: block.position.y,
-                    z: block.position.z,
-                    type: block.userData.type
-                }),
-                settings: {
-                    controls: KEY_BINDINGS,
-                    interface: {
-                        primaryColor: getComputedStyle(document.documentElement)
-                            .getPropertyValue('--primary-color')
-                    }
-                }
-            };
-
-            localStorage.setItem(`save_${saveName}`, JSON.stringify(saveData));
-            refreshSaveList();
-        }
-
-        function loadSave(saveName) {
-            const saveData = JSON.parse(localStorage.getItem(`save_${saveName}`));
-            blocks.forEach(block => scene.remove(block));
-            blocks.clear();
-            saveData.world.forEach(block => addBlock(block.x, block.y, block.z, block.type));
-            applySettings(saveData.settings);
-        }
-
-        function applySettings(settings) {
-            // Применение настроек управления
-            Object.assign(KEY_BINDINGS, settings.controls);
-            
-            // Применение настроек интерфейса
-            document.documentElement.style.setProperty(
-                '--primary-color', 
-                settings.interface.primaryColor
-            );
-        }
-
-        function refreshSaveList() {
-            const saves = Object.keys(localStorage)
-                .filter(k => k.startsWith('save_'))
-                .map(k => k.replace('save_', ''));
-            
-            const list = document.getElementById('save-list');
-            list.innerHTML = saves.map(name => `
-                <div class="save-item">
-                    ${name}
-                    <button onclick="loadSave('${name}')">Загрузить</button>
-                    <button onclick="deleteSave('${name}')">Удалить</button>
-                </div>
-            `).join('');
-        }
-
-        function deleteSave(saveName) {
-            localStorage.removeItem(`save_${saveName}`);
-            refreshSaveList();
-        }
-
-        function refreshControlsList() {
-            const list = document.getElementById('controls-list');
-            list.innerHTML = Object.entries(KEY_BINDINGS).map(([action, key]) => `
-                <div class="control-item">
-                    <span>${action.replace(/([A-Z])/g, ' $1').trim()}</span>
-                    <button onclick="remapControl('${action}')">${key.toUpperCase()}</button>
-                </div>
-            `).join('');
-        }
-
-        function remapControl(action) {
-            const listener = e => {
-                KEY_BINDINGS[action] = e.key.toLowerCase();
-                document.removeEventListener('keydown', listener);
-                refreshControlsList();
-            };
-            document.addEventListener('keydown', listener);
-        }
-
-        function initColorPicker() {
-            const colors = [
-                '#0088cc', '#20c997', '#dc3545', '#ffc107', 
-                '#6610f2', '#fd7e14', '#e83e8c', '#6f42c1'
-            ];
-            
-            const picker = document.getElementById('color-picker');
-            picker.innerHTML = colors.map(color => `
-                <div class="color-option" 
-                     style="background: ${color}"
-                     onclick="selectColor('${color}')"></div>
-            `).join('');
-        }
-
-        function selectColor(color) {
-            document.documentElement.style.setProperty('--primary-color', color);
-            document.querySelectorAll('.color-option').forEach(o => 
-                o.classList.remove('selected'));
-            event.target.classList.add('selected');
         }
 
         // Автосохранение каждые 30 секунд
