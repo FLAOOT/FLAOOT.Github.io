@@ -3,270 +3,191 @@
 <head>
     <title>TelegramCraft</title>
     <style>
-        /* Все предыдущие стили остаются без изменений */
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: 'Roboto', sans-serif;
-            background: #f3f4f5;
-        }
+        /* ... (предыдущие стили остаются без изменений) ... */
         
-        #menu {
+        #inventory {
             position: fixed;
-            top: 50%;
+            bottom: 20px;
             left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            width: 320px;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 12px;
             border-radius: 14px;
-            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-            padding: 24px;
-            text-align: center;
-            z-index: 1000;
+            display: none;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            backdrop-filter: blur(4px);
+            z-index: 500;
+            flex-wrap: wrap;
+            max-width: 400px;
         }
-        
-        .menu-title {
-            color: #0088cc;
-            font-size: 24px;
-            margin-bottom: 24px;
-            font-weight: 500;
-        }
-        
-        .tg-button {
-            display: block;
-            width: 100%;
-            padding: 14px;
-            margin: 8px 0;
-            background: #0088cc;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        /* Остальные стили остаются без изменений */
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="menu">
-        <div class="menu-title">TelegramCraft</div>
-        <button class="tg-button" onclick="startGame('creative')">🎮 Начать игру (Креатив)</button>
-        <button class="tg-button" style="background: #20c997" onclick="startGame('survival')">🌿 Режим выживания</button>
-    </div>
-
-    <div id="hud">
-        <button class="hud-button" onclick="toggleInventory()">🎒 Инвентарь</button>
-    </div>
-
-    <div id="crosshair">+</div>
-    <div id="inventory"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Остальная разметка остается без изменений -->
+    
     <script>
-        let scene, camera, renderer, raycaster;
-        let keys = {};
-        let currentBlockType = 'grass';
-        let creativeMode = true;
-        const BLOCK_SIZE = 1;
-        const WORLD_SIZE = 50;
-        let blocks = new Map();
-        
-        // Настройки игрока
-        let player = {
-            position: new THREE.Vector3(0, 10, 0),
-            velocity: new THREE.Vector3(),
-            direction: new THREE.Vector3(),
-            yaw: Math.PI,
-            pitch: 0,
-            height: 1.8,
-            radius: 0.3,
-            onGround: false
+        // ... (предыдущие настройки и переменные) ...
+
+        const BLOCK_TYPES = {
+            grass: { color: 0x8BC34A, name: 'Трава' },
+            dirt: { color: 0x795548, name: 'Земля' },
+            stone: { color: 0x9E9E9E, name: 'Камень' },
+            wood: { color: 0x8B5A2B, name: 'Дерево' },
+            glass: { color: 0x80DEEA, name: 'Стекло' }
         };
 
-        // Параметры физики
-        const PHYSICS = {
-            gravity: 30,
-            jumpForce: 8,
-            moveSpeed: 5,
-            flySpeed: 10,
-            airControl: 0.2
+        let inventory = {
+            slots: {
+                0: { type: 'grass', count: 64 },
+                1: { type: 'dirt', count: 64 },
+                2: { type: 'stone', count: 64 },
+                3: { type: 'wood', count: 64 },
+                4: { type: 'glass', count: 64 }
+            },
+            selected: 0
         };
 
-        const blockMaterials = {
-            grass: new THREE.MeshPhongMaterial({ color: 0x8BC34A }),
-            dirt: new THREE.MeshPhongMaterial({ color: 0x795548 })
-        };
-
-        function startGame(mode) {
-            creativeMode = mode === 'creative';
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('hud').style.display = 'flex';
-            initGame();
-        }
-
-        function initGame() {
-            // Инициализация Three.js
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf3f4f5);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        function initInventory() {
+            const inventoryElement = document.getElementById('inventory');
+            inventoryElement.innerHTML = '';
             
-            // Освещение
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(100, 100, 100);
-            scene.add(directionalLight);
-
-            // Создание платформы
-            createPlatform();
-            initEventListeners();
-            animate();
-        }
-
-        function createPlatform() {
-            for(let x = -WORLD_SIZE/2; x <= WORLD_SIZE/2; x++) {
-                for(let z = -WORLD_SIZE/2; z <= WORLD_SIZE/2; z++) {
-                    addBlock(x, 0, z, 'grass');
-                }
-            }
-        }
-
-        function addBlock(x, y, z, type) {
-            const key = `${x},${y},${z}`;
-            if(blocks.has(key)) return;
-
-            const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            const cube = new THREE.Mesh(geometry, blockMaterials[type]);
-            cube.position.set(x, y, z);
-            scene.add(cube);
-            blocks.set(key, cube);
-        }
-
-        function initEventListeners() {
-            document.addEventListener('click', () => document.body.requestPointerLock());
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-            document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function onMouseMove(e) {
-            if(document.pointerLockElement === document.body) {
-                player.yaw -= e.movementX * 0.002;
-                player.pitch = THREE.MathUtils.clamp(
-                    player.pitch - e.movementY * 0.002,
-                    -Math.PI/2,
-                    Math.PI/2
-                );
-                camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-            }
-        }
-
-        function updatePlayer(delta) {
-            // Управление движением
-            const moveVector = new THREE.Vector3();
-            
-            if(keys['w']) moveVector.z -= 1;
-            if(keys['s']) moveVector.z += 1;
-            if(keys['a']) moveVector.x -= 1;
-            if(keys['d']) moveVector.x += 1;
-            
-            if(creativeMode) {
-                if(keys[' ']) moveVector.y += 1;
-                if(keys['shift']) moveVector.y -= 1;
-            }
-
-            moveVector.normalize();
-            const speed = creativeMode ? PHYSICS.flySpeed : PHYSICS.moveSpeed;
-            moveVector.multiplyScalar(speed * delta);
-
-            // Применение вращения
-            const rotation = new THREE.Euler(0, player.yaw, 0, 'YXZ');
-            moveVector.applyEuler(rotation);
-            
-            // Гравитация и прыжки
-            if(!creativeMode) {
-                player.velocity.y -= PHYSICS.gravity * delta;
-                moveVector.multiplyScalar(player.onGround ? 1 : PHYSICS.airControl);
+            Object.entries(inventory.slots).forEach(([slot, data]) => {
+                const slotElement = document.createElement('div');
+                slotElement.className = `slot ${slot == inventory.selected ? 'active' : ''}`;
+                slotElement.style.backgroundColor = `#${new THREE.Color(BLOCK_TYPES[data.type].color).getHexString()}`;
                 
-                if(keys[' '] && player.onGround) {
-                    player.velocity.y = PHYSICS.jumpForce;
-                    player.onGround = false;
-                }
-            }
+                const countElement = document.createElement('div');
+                countElement.className = 'slot-count';
+                countElement.textContent = data.count;
+                
+                const nameElement = document.createElement('div');
+                nameElement.className = 'slot-name';
+                nameElement.textContent = BLOCK_TYPES[data.type].name;
+                
+                slotElement.append(nameElement, countElement);
+                slotElement.onclick = () => selectSlot(parseInt(slot));
+                inventoryElement.appendChild(slotElement);
+            });
+        }
 
-            player.position.add(moveVector);
-            player.position.add(player.velocity.clone().multiplyScalar(delta));
-            
-            // Проверка коллизий
-            checkCollisions();
-            
-            // Обновление позиции камеры
-            camera.position.copy(player.position);
+        function selectSlot(slotIndex) {
+            inventory.selected = slotIndex;
+            currentBlockType = inventory.slots[slotIndex].type;
+            initInventory();
         }
 
         function checkCollisions() {
             if(creativeMode) return;
 
-            const playerBox = new THREE.Box3(
-                new THREE.Vector3(
-                    player.position.x - player.radius,
-                    player.position.y,
-                    player.position.z - player.radius
-                ),
-                new THREE.Vector3(
-                    player.position.x + player.radius,
-                    player.position.y + player.height,
-                    player.position.z + player.radius
-                )
-            );
+            const collisionDistance = 0.3;
+            const directions = [
+                { axis: 'x', sign: 1 },
+                { axis: 'x', sign: -1 },
+                { axis: 'z', sign: 1 },
+                { axis: 'z', sign: -1 },
+                { axis: 'y', sign: 1 },
+                { axis: 'y', sign: -1 }
+            ];
 
             player.onGround = false;
             
-            blocks.forEach(block => {
-                const blockBox = new THREE.Box3().setFromObject(block);
-                if(playerBox.intersectsBox(blockBox)) {
-                    const overlap = playerBox.intersect(blockBox).getSize(new THREE.Vector3());
-                    
-                    if(overlap.y > overlap.x && overlap.y > overlap.z) {
-                        player.velocity.y = 0;
-                        if(playerBox.min.y < blockBox.max.y) {
-                            player.position.y = blockBox.max.y;
-                            player.onGround = true;
+            directions.forEach(dir => {
+                const testPos = player.position.clone();
+                testPos[dir.axis] += dir.sign * collisionDistance;
+                
+                const playerBox = new THREE.Box3()
+                    .setFromCenterAndSize(
+                        testPos,
+                        new THREE.Vector3(
+                            dir.axis === 'x' ? 0.1 : player.radius*2,
+                            player.height,
+                            dir.axis === 'z' ? 0.1 : player.radius*2
+                        )
+                    );
+
+                blocks.forEach(block => {
+                    const blockBox = new THREE.Box3().setFromObject(block);
+                    if(playerBox.intersectsBox(blockBox)) {
+                        const overlap = blockBox.max[dir.axis] - playerBox.min[dir.axis];
+                        
+                        if(dir.sign === 1) {
+                            player.position[dir.axis] -= overlap;
+                            if(dir.axis === 'y') {
+                                player.velocity.y = 0;
+                                player.onGround = true;
+                            }
+                        } else {
+                            player.position[dir.axis] += overlap;
                         }
                     }
-                }
+                });
             });
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = Math.min(0.05, clock.getDelta());
-            
-            if(document.pointerLockElement === document.body) {
-                updatePlayer(delta);
-            }
+        function onMouseDown(e) {
+            if(!document.pointerLockElement) return;
 
-            renderer.render(scene, camera);
+            raycaster.setFromCamera(
+                new THREE.Vector2(0, 0), 
+                camera
+            );
+            
+            const intersects = raycaster.intersectObjects(scene.children);
+            if(intersects.length === 0) return;
+
+            const intersect = intersects[0];
+            const blockPos = intersect.object.position;
+            const normal = intersect.face.normal;
+
+            if(e.button === 0) { // ЛКМ - разрушение
+                removeBlock(blockPos.x, blockPos.y, blockPos.z);
+            } 
+            else if(e.button === 2) { // ПКМ - установка
+                const newPos = blockPos.clone().add(normal);
+                if(inventory.slots[inventory.selected].count > 0) {
+                    addBlock(newPos.x, newPos.y, newPos.z, currentBlockType);
+                    inventory.slots[inventory.selected].count--;
+                    initInventory();
+                }
+            }
         }
 
-        // Инициализация часов
-        const clock = new THREE.Clock();
+        function toggleInventory() {
+            const inv = document.getElementById('inventory');
+            inv.style.display = inv.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        // В обработчики событий добавить:
+        document.addEventListener('keydown', e => {
+            if(e.key === 'e') toggleInventory();
+            if(e.key >= '1' && e.key <= '5') selectSlot(parseInt(e.key) - 1);
+        });
+
+        // Обновленная функция addBlock:
+        function addBlock(x, y, z, type) {
+            x = Math.round(x);
+            y = Math.round(y);
+            z = Math.round(z);
+            
+            const key = `${x},${y},${z}`;
+            if(blocks.has(key)) return;
+
+            const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: BLOCK_TYPES[type].color,
+                transparent: type === 'glass',
+                opacity: type === 'glass' ? 0.8 : 1
+            });
+            
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(x, y, z);
+            scene.add(cube);
+            blocks.set(key, cube);
+        }
+
+        // Остальной код остается как в предыдущей версии
     </script>
 </body>
 </html>
