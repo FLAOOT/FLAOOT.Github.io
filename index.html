@@ -1,221 +1,166 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Improved Minecraft</title>
+    <title>Advanced Minecraft</title>
     <style>
-        /* Обновленные стили интерфейса */
-        :root {
-            --primary-color: #4CAF50;
-            --secondary-color: #45a049;
-            --hover-color: #66bb6a;
-        }
-
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: 'Arial', sans-serif;
-            background: #1a1a1a;
-        }
-
-        #crosshair {
+        /* ... предыдущие стили ... */
+        #menu {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 28px;
-            pointer-events: none;
-            text-shadow: 0 0 5px rgba(0,0,0,0.5);
-        }
-
-        .ui-panel {
-            position: fixed;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
             border-radius: 10px;
-            padding: 15px;
-            backdrop-filter: blur(5px);
-        }
-
-        #hotbar {
-            bottom: 20px;
-            display: flex;
-            gap: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        #inventory {
-            bottom: 80px;
-            width: 320px;
-            display: none;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .slot {
-            width: 48px;
-            height: 48px;
-            border: 2px solid #555;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            background-size: cover;
-            position: relative;
-        }
-
-        .slot:hover {
-            transform: scale(1.1);
-            border-color: var(--hover-color);
-        }
-
-        .active {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 15px var(--secondary-color);
-        }
-
-        /* Редактор интерфейса */
-        #ui-editor {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 250px;
+            text-align: center;
             color: white;
         }
-
-        .editor-section {
-            margin: 10px 0;
-            padding: 10px;
-            background: rgba(255,255,255,0.1);
+        .menu-btn {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #444;
+            border: none;
+            color: white;
             border-radius: 5px;
+        }
+        .menu-btn:hover {
+            background: #666;
         }
     </style>
 </head>
 <body>
-    <div id="crosshair">✛</div>
-    <div id="hotbar" class="ui-panel"></div>
-    <div id="inventory" class="ui-panel"></div>
-    
-    <!-- Редактор интерфейса -->
-    <div id="ui-editor" class="ui-panel">
-        <h3>Настройки интерфейса</h3>
-        <div class="editor-section">
-            <label>Цвет интерфейса:</label>
-            <input type="color" id="ui-color-picker">
-        </div>
-        <button onclick="toggleUIEditor()">Скрыть редактор</button>
+    <div id="menu">
+        <h1>Minecraft Web</h1>
+        <button class="menu-btn" onclick="startGame('creative')">Креативный режим</button>
+        <button class="menu-btn" onclick="startGame('survival')">Режим выживания</button>
+        <button class="menu-btn" onclick="loadWorld()">Загрузить мир</button>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Остальные элементы остаются как прежде -->
     <script>
-        // Инициализация игры
-        const clock = new THREE.Clock();
-        let scene, camera, renderer, raycaster;
-        
-        // Настройки
-        const SETTINGS = {
-            moveSpeed: 5,
-            lookSpeed: 0.002,
-            gravity: 30,
-            jumpForce: 8,
-            worldSize: 50,
-            renderDistance: 16
+        // ... предыдущие настройки ...
+
+        let creativeMode = true;
+        const WORLD_SIZE = 100;
+        const JUMP_FORCE = 12;
+        const FLY_SPEED = 8;
+
+        const blockMaterials = {
+            grass: new THREE.MeshPhongMaterial({ color: 0x00ff00 }),
+            dirt: new THREE.MeshPhongMaterial({ color: 0x8B4513 }),
+            stone: new THREE.MeshPhongMaterial({ color: 0x808080 }),
+            wood: new THREE.MeshPhongMaterial({ color: 0x8B5A2B }),
+            glass: new THREE.MeshStandardMaterial({ 
+                color: 0x00ffff, 
+                transparent: true, 
+                opacity: 0.7 
+            }),
+            sand: new THREE.MeshPhongMaterial({ color: 0xFFFF00 }),
+            brick: new THREE.MeshPhongMaterial({ color: 0xB22222 }),
+            leaves: new THREE.MeshPhongMaterial({ color: 0x228B22, transparent: true, opacity: 0.8 }),
+            water: new THREE.MeshStandardMaterial({
+                color: 0x0000FF,
+                transparent: true,
+                opacity: 0.5,
+                metalness: 0.7,
+                roughness: 0.1
+            })
         };
 
-        // Расширенные материалы блоков
-        const BLOCK_TYPES = {
-            grass: { color: 0x50C878 },
-            dirt: { color: 0x806040 },
-            stone: { color: 0x808080 },
-            wood: { color: 0x8B5A2B },
-            glass: { color: 0x80C0FF, transparent: true, opacity: 0.7 },
-            sand: { color: 0xF4A460 },
-            brick: { color: 0xB22222 },
-            gold: { color: 0xFFD700 },
-            leaves: { color: 0x228B22, transparent: true, opacity: 0.8 }
-        };
+        function startGame(mode) {
+            creativeMode = mode === 'creative';
+            document.getElementById('menu').style.display = 'none';
+            if(creativeMode) {
+                moveSpeed = 10;
+                GRAVITY = 0;
+                player.position.set(0, 20, 0);
+            } else {
+                moveSpeed = 5;
+                GRAVITY = 30;
+                player.position.set(0, 5, 0);
+            }
+            init();
+        }
 
-        // Инициализация материалов
-        const blockMaterials = Object.fromEntries(
-            Object.entries(BLOCK_TYPES).map(([name, props]) => [
-                name,
-                new THREE[props.transparent ? 'MeshStandardMaterial' : 'MeshPhongMaterial'](props)
-            ])
-        );
+        function updatePlayer(delta) {
+            if(!creativeMode) {
+                velocity.y -= GRAVITY * delta;
+            } else {
+                velocity.y = 0;
+            }
 
-        class Player {
-            constructor() {
-                this.height = 1.8;
-                this.radius = 0.4;
-                this.position = new THREE.Vector3(0, 15, 0);
-                this.velocity = new THREE.Vector3();
-                this.onGround = false;
+            const direction = new THREE.Vector3();
+            if(keys['w']) direction.z -= 1;
+            if(keys['s']) direction.z += 1;
+            if(keys['a']) direction.x -= 1;
+            if(keys['d']) direction.x += 1;
+
+            if(creativeMode) {
+                if(keys[' ']) direction.y += 1;
+                if(keys['shift']) direction.y -= 1;
+            }
+
+            direction.normalize();
+            direction.applyEuler(new THREE.Euler(pitch, yaw, 0));
+            
+            const speed = creativeMode ? FLY_SPEED : moveSpeed;
+            const newPos = player.position.clone()
+                .add(direction.multiplyScalar(speed * delta))
+                .add(velocity.clone().multiplyScalar(delta));
+
+            const finalPos = creativeMode ? newPos : checkCollisions(newPos);
+            player.position.copy(finalPos);
+            camera.position.copy(finalPos.add(new THREE.Vector3(0, player.height/2, 0)));
+
+            if(!creativeMode && keys[' '] && canJump) {
+                velocity.y = JUMP_FORCE;
+                canJump = false;
             }
         }
 
-        let player = new Player();
-        let blocks = new Map();
-        let keys = {};
-        let currentBlockType = 'grass';
-
-        // Основные функции
-        function init() {
-            setupScene();
-            setupLighting();
-            setupWorld();
-            setupUI();
-            setupEventListeners();
-            animate();
-        }
-
-        function setupScene() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
+        function createGround() {
+            for(let x = -WORLD_SIZE; x <= WORLD_SIZE; x++) {
+                for(let z = -WORLD_SIZE; z <= WORLD_SIZE; z++) {
+                    addBlock(x, 0, z, 'grass');
+                    for(let y = -1; y >= -3; y--) {
+                        addBlock(x, y, z, 'dirt');
+                    }
+                    if(Math.random() < 0.1) addBlock(x, 1, z, 'sand');
+                }
+            }
             
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.copy(player.position);
+            // Генерация деревьев
+            for(let i = 0; i < WORLD_SIZE/2; i++) {
+                const x = Math.floor(Math.random() * WORLD_SIZE - WORLD_SIZE/2);
+                const z = Math.floor(Math.random() * WORLD_SIZE - WORLD_SIZE/2);
+                generateTree(x, 1, z);
+            }
+        }
+
+        function generateTree(x, y, z) {
+            // Ствол
+            const height = 4 + Math.floor(Math.random() * 3);
+            for(let i = 0; i < height; i++) {
+                addBlock(x, y + i, z, 'wood');
+            }
             
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+            // Листва
+            for(let dx = -2; dx <= 2; dx++) {
+                for(let dz = -2; dz <= 2; dz++) {
+                    for(let dy = 0; dy < 3; dy++) {
+                        if(Math.abs(dx) + Math.abs(dz) + dy !== 4) {
+                            addBlock(x + dx, y + height - 1 + dy, z + dz, 'leaves');
+                        }
+                    }
+                }
+            }
         }
 
-        function setupLighting() {
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(100, 100, 100);
-            scene.add(light);
-            scene.add(new THREE.AmbientLight(0x404040));
-        }
+        // В функции initInventory обновляем список блоков:
+        const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'glass', 'sand', 'brick', 'leaves', 'water'];
 
-        function setupWorld() {
-            raycaster = new THREE.Raycaster();
-            loadWorld();
-        }
-
-        function setupUI() {
-            // Инициализация горячей панели
-            const hotbar = document.getElementById('hotbar');
-            Object.keys(BLOCK_TYPES).forEach((type, i) => {
-                const slot = createSlot(type, i);
-                hotbar.appendChild(slot);
-            });
-
-            // Инициализация редактора интерфейса
-            document.getElementById('ui-color-picker').addEventListener('input', (e) => {
-                document.documentElement.style.setProperty('--primary-color', e.target.value);
-                localStorage.setItem('uiColor', e.target.value);
-            });
-
-            // Загрузка сохраненных настроек
-            const savedColor = localStorage.getItem('uiColor') || '#4CAF50';
-            document.documentElement.style.setProperty('--primary-color', savedColor);
-            document.getElementById('ui-color-picker').value = savedColor;
-        }
-
-        // Остальные функции остаются аналогичными, но с улучшенной обработкой коллизий
-        // ... (полный код требует больше места, но основные улучшения показаны)
-        
-        // Запуск игры
-        init();
+        // Остальные функции остаются аналогичными, но с учетом новых блоков
     </script>
 </body>
 </html>
