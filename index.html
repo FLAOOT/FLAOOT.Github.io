@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>telecraft</title>
+    <title>tolk</title>
     <style>
+        :root {
+            --primary-color: #0088cc;
+            --background-color: #f3f4f5;
+            --surface-color: #ffffff;
+            --text-color: #212121;
+        }
+
         body { 
             margin: 0; 
             overflow: hidden; 
             font-family: 'Roboto', sans-serif;
-            background: #f3f4f5;
+            background: var(--background-color);
         }
         
         #menu {
@@ -15,7 +22,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: white;
+            background: var(--surface-color);
             width: 320px;
             border-radius: 14px;
             box-shadow: 0 12px 24px rgba(0,0,0,0.1);
@@ -25,7 +32,7 @@
         }
         
         .menu-title {
-            color: #0088cc;
+            color: var(--primary-color);
             font-size: 24px;
             margin-bottom: 24px;
             font-weight: 500;
@@ -36,7 +43,7 @@
             width: 100%;
             padding: 14px;
             margin: 8px 0;
-            background: #0088cc;
+            background: var(--primary-color);
             color: white;
             border: none;
             border-radius: 8px;
@@ -66,7 +73,7 @@
         }
         
         .hud-button {
-            background: #0088cc;
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 8px 16px;
@@ -117,15 +124,15 @@
         }
         
         .slot.active {
-            border-color: #0088cc;
-            box-shadow: 0 0 0 2px #0088cc33;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent);
         }
         
         .slot-count {
             position: absolute;
             bottom: 4px;
             right: 4px;
-            background: #0088cc;
+            background: var(--primary-color);
             color: white;
             width: 18px;
             height: 18px;
@@ -134,24 +141,6 @@
             align-items: center;
             justify-content: center;
             font-size: 12px;
-        }
-        
-        .page-controls {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-        }
-        
-        .page-btn {
-            padding: 6px 12px;
-            margin: 0 4px;
-            border-radius: 4px;
-            border: 1px solid #0088cc;
-            background: white;
-            color: #0088cc;
-            cursor: pointer;
         }
         
         .slot-key {
@@ -163,6 +152,70 @@
             background: rgba(0,0,0,0.5);
             padding: 2px;
             border-radius: 3px;
+        }
+        
+        #quick-menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--surface-color);
+            width: 400px;
+            border-radius: 14px;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+            padding: 20px;
+            z-index: 2000;
+            display: none;
+        }
+
+        .menu-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .menu-tab {
+            padding: 10px 20px;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .menu-tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .menu-page {
+            display: none;
+        }
+
+        .menu-page.active {
+            display: block;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .color-option.selected {
+            border-color: var(--text-color);
+        }
+
+        .save-list {
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -178,9 +231,32 @@
         <button class="hud-button" onclick="toggleInventory()">🎒 Инвентарь</button>
     </div>
 
-    <div class="page-controls">
-        <button class="page-btn" onclick="switchInventoryPage(0)">1</button>
-        <button class="page-btn" onclick="switchInventoryPage(1)">2</button>
+    <div id="quick-menu">
+        <div class="menu-tabs">
+            <button class="menu-tab active" onclick="switchMenuTab('save')">Сохранения</button>
+            <button class="menu-tab" onclick="switchMenuTab('load')">Загрузка</button>
+            <button class="menu-tab" onclick="switchMenuTab('controls')">Управление</button>
+            <button class="menu-tab" onclick="switchMenuTab('interface')">Интерфейс</button>
+        </div>
+
+        <div id="save-page" class="menu-page active">
+            <input type="text" id="save-name" placeholder="Имя сохранения">
+            <button onclick="saveWithName()">Сохранить</button>
+            <div class="save-list" id="save-list"></div>
+        </div>
+
+        <div id="load-page" class="menu-page">
+            <div class="save-list" id="load-list"></div>
+        </div>
+
+        <div id="controls-page" class="menu-page">
+            <div id="controls-list"></div>
+        </div>
+
+        <div id="interface-page" class="menu-page">
+            <h4>Цветовая схема:</h4>
+            <div class="color-picker" id="color-picker"></div>
+        </div>
     </div>
 
     <div id="crosshair">+</div>
@@ -188,233 +264,254 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let scene, camera, renderer, raycaster;
-        let keys = {};
-        let currentBlockType = 'color0';
-        let creativeMode = true;
-        const BLOCK_SIZE = 1;
-        const WORLD_SIZE = 50;
-        let blocks = new Map();
-        const clock = new THREE.Clock();
-        let currentInventoryPage = 0;
-        const HOTKEYS = "1234567890qwertyuiopasdf".split('');
+    // Уникальные горячие клавиши Alt+[1-9,0,q,w,e,r,t,y,u,i,o,p,a,s,d,f]
+    const HOTKEYS = [
+        'Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5',
+        'Alt+6', 'Alt+7', 'Alt+8', 'Alt+9', 'Alt+0',
+        'Alt+q', 'Alt+w', 'Alt+e', 'Alt+r', 'Alt+t',
+        'Alt+y', 'Alt+u', 'Alt+i', 'Alt+o', 'Alt+p',
+        'Alt+a', 'Alt+s', 'Alt+d', 'Alt+f'
+    ];
 
-        const COLORS = [
-            {name: 'Красный', color: 0xFF0000}, {name: 'Оранжевый', color: 0xFFA500},
-            {name: 'Жёлтый', color: 0xFFFF00}, {name: 'Зеленый', color: 0x00FF00},
-            {name: 'Голубой', color: 0x00FFFF}, {name: 'Синий', color: 0x0000FF},
-            {name: 'Фиолетовый', color: 0x800080}, {name: 'Чёрный', color: 0x000000},
-            {name: 'Белый', color: 0xFFFFFF}, {name: 'Серый', color: 0x808080},
-            {name: 'Коричневый', color: 0x964B00}, {name: 'Розовый', color: 0xFFC0CB}
-        ];
+    let scene, camera, renderer, raycaster;
+    let keys = {};
+    let currentBlockType = 'color0';
+    let creativeMode = true;
+    const BLOCK_SIZE = 1;
+    const WORLD_SIZE = 50;
+    let blocks = new Map();
+    const clock = new THREE.Clock();
+    
+    const COLORS = [
+        {name: 'Красный', color: 0xFF0000}, {name: 'Оранжевый', color: 0xFFA500},
+        {name: 'Жёлтый', color: 0xFFFF00}, {name: 'Зеленый', color: 0x00FF00},
+        {name: 'Голубой', color: 0x00FFFF}, {name: 'Синий', color: 0x0000FF},
+        {name: 'Фиолетовый', color: 0x800080}, {name: 'Чёрный', color: 0x000000},
+        {name: 'Белый', color: 0xFFFFFF}, {name: 'Серый', color: 0x808080},
+        {name: 'Коричневый', color: 0x964B00}, {name: 'Розовый', color: 0xFFC0CB}
+    ];
 
-        const BLOCK_TYPES = {};
-        COLORS.forEach((color, i) => {
-            BLOCK_TYPES[`color${i}`] = { ...color, type: 'solid' };
-            BLOCK_TYPES[`glass${i}`] = { 
-                ...color, 
-                name: `${color.name} Стекло`,
-                type: 'glass',
-                transparent: true,
-                opacity: 0.7
-            };
+    const BLOCK_TYPES = {};
+    COLORS.forEach((color, i) => {
+        BLOCK_TYPES[`color${i}`] = { 
+            ...color, 
+            type: 'solid',
+            opacity: 1
+        };
+        BLOCK_TYPES[`glass${i}`] = { 
+            ...color, 
+            name: `${color.name} Стекло`,
+            type: 'glass',
+            transparent: true,
+            opacity: 0.3
+        };
+    });
+
+    let player = {
+        position: new THREE.Vector3(0, 10, 0),
+        velocity: new THREE.Vector3(),
+        direction: new THREE.Vector3(),
+        yaw: Math.PI,
+        pitch: 0,
+        height: 1.8,
+        radius: 0.3,
+        onGround: false
+    };
+
+    const PHYSICS = {
+        gravity: 30,
+        jumpForce: 8,
+        moveSpeed: 5,
+        flySpeed: 10,
+        airControl: 0.2
+    };
+
+    function startGame(mode) {
+        creativeMode = mode === 'creative';
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('hud').style.display = 'flex';
+        initGame();
+    }
+
+    function initGame() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf3f4f5);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.copy(player.position);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(100, 100, 100);
+        scene.add(directionalLight);
+
+        raycaster = new THREE.Raycaster();
+        createPlatform();
+        initInventory();
+        initEventListeners();
+        loadWorld();
+        initColorPicker();
+        animate();
+    }
+
+    function createPlatform() {
+        for(let x = -WORLD_SIZE/2; x <= WORLD_SIZE/2; x++) {
+            for(let z = -WORLD_SIZE/2; z <= WORLD_SIZE/2; z++) {
+                addBlock(x, 0, z, 'color8');
+            }
+        }
+    }
+
+    function addBlock(x, y, z, type) {
+        x = Math.round(x);
+        y = Math.round(y);
+        z = Math.round(z);
+        
+        const key = `${x},${y},${z}`;
+        if(blocks.has(key)) return;
+
+        const blockData = BLOCK_TYPES[type];
+        const material = new THREE.MeshPhongMaterial({
+            color: blockData.color,
+            transparent: blockData.transparent,
+            opacity: blockData.opacity
         });
 
-        let player = {
-            position: new THREE.Vector3(0, 10, 0),
-            velocity: new THREE.Vector3(),
-            direction: new THREE.Vector3(),
-            yaw: Math.PI,
-            pitch: 0,
-            height: 1.8,
-            radius: 0.3,
-            onGround: false
-        };
+        const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(x, y, z);
+        cube.userData = { type: type };
+        scene.add(cube);
+        blocks.set(key, cube);
+        saveWorld();
+    }
 
-        const PHYSICS = {
-            gravity: 30,
-            jumpForce: 8,
-            moveSpeed: 5,
-            flySpeed: 10,
-            airControl: 0.2
-        };
-
-        function startGame(mode) {
-            creativeMode = mode === 'creative';
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('hud').style.display = 'flex';
-            document.querySelector('.page-controls').style.display = 'block';
-            initGame();
-        }
-
-        function initGame() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf3f4f5);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.copy(player.position);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(100, 100, 100);
-            scene.add(directionalLight);
-
-            raycaster = new THREE.Raycaster();
-            createPlatform();
-            initInventory();
-            initEventListeners();
-            loadWorld();
-            animate();
-        }
-
-        function createPlatform() {
-            for(let x = -WORLD_SIZE/2; x <= WORLD_SIZE/2; x++) {
-                for(let z = -WORLD_SIZE/2; z <= WORLD_SIZE/2; z++) {
-                    addBlock(x, 0, z, 'color8');
-                }
-            }
-        }
-
-        function addBlock(x, y, z, type) {
-            x = Math.round(x);
-            y = Math.round(y);
-            z = Math.round(z);
-            
-            const key = `${x},${y},${z}`;
-            if(blocks.has(key)) return;
-
-            const blockData = BLOCK_TYPES[type];
-            const material = new THREE.MeshPhongMaterial({
-                color: blockData.color,
-                transparent: blockData.transparent || false,
-                opacity: blockData.opacity || 1
-            });
-
-            const geometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(x, y, z);
-            cube.userData = { type: type };
-            scene.add(cube);
-            blocks.set(key, cube);
+    function removeBlock(x, y, z) {
+        x = Math.round(x);
+        y = Math.round(y);
+        z = Math.round(z);
+        
+        const key = `${x},${y},${z}`;
+        if(blocks.has(key)) {
+            scene.remove(blocks.get(key));
+            blocks.delete(key);
             saveWorld();
         }
+    }
 
-        function removeBlock(x, y, z) {
-            x = Math.round(x);
-            y = Math.round(y);
-            z = Math.round(z);
+    function initInventory() {
+        const inventoryElement = document.getElementById('inventory');
+        inventoryElement.innerHTML = `
+            <div class="inventory-page active" data-page="0"></div>
+            <div class="inventory-page" data-page="1"></div>
+        `;
+
+        Object.entries(BLOCK_TYPES).forEach(([type, data], index) => {
+            const page = Math.floor(index / 12);
+            const pageElement = inventoryElement.querySelector(`[data-page="${page}"]`);
+            const hotkey = HOTKEYS[index];
             
-            const key = `${x},${y},${z}`;
-            if(blocks.has(key)) {
-                scene.remove(blocks.get(key));
-                blocks.delete(key);
-                saveWorld();
+            const slot = document.createElement('div');
+            slot.className = `slot ${index === 0 ? 'active' : ''}`;
+            slot.style.backgroundColor = `#${new THREE.Color(data.color).getHexString()}`;
+            slot.dataset.type = type;
+            
+            const key = document.createElement('div');
+            key.className = 'slot-key';
+            key.textContent = hotkey.replace('Alt+', '⎇');
+            
+            const name = document.createElement('div');
+            name.style.cssText = 'position: absolute; top: 18px; left: 2px; font-size: 8px; color: #000;';
+            name.textContent = data.name;
+            
+            slot.appendChild(key);
+            slot.appendChild(name);
+            pageElement.appendChild(slot);
+        });
+    }
+
+    function selectSlot(type) {
+        document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+        const slot = document.querySelector(`.slot[data-type="${type}"]`);
+        if(slot) slot.classList.add('active');
+        currentBlockType = type;
+    }
+
+    function saveWorld() {
+        const saveData = Array.from(blocks.values()).map(block => ({
+            x: block.position.x,
+            y: block.position.y,
+            z: block.position.z,
+            type: block.userData.type
+        }));
+        localStorage.setItem('world', JSON.stringify(saveData));
+    }
+
+    function loadWorld() {
+        const saveData = JSON.parse(localStorage.getItem('world') || '[]');
+        saveData.forEach(block => addBlock(block.x, block.y, block.z, block.type));
+    }
+
+    function initEventListeners() {
+        document.addEventListener('click', () => document.body.requestPointerLock());
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        document.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onMouseMove(e) {
+        if(document.pointerLockElement === document.body) {
+            player.yaw -= e.movementX * 0.002;
+            player.pitch = THREE.MathUtils.clamp(
+                player.pitch - e.movementY * 0.002,
+                -Math.PI/2,
+                Math.PI/2
+            );
+            camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+        }
+    }
+
+    function onKeyDown(e) {
+        const key = e.key.toLowerCase();
+        keys[key] = true;
+
+        // Обработка горячих клавиш с Alt
+        if(e.altKey) {
+            const keyMap = {
+                '1':0, '2':1, '3':2, '4':3, '5':4,
+                '6':5, '7':6, '8':7, '9':8, '0':9,
+                'q':10, 'w':11, 'e':12, 'r':13, 't':14,
+                'y':15, 'u':16, 'i':17, 'o':18, 'p':19,
+                'a':20, 's':21, 'd':22, 'f':23
+            };
+            
+            if(key in keyMap) {
+                const index = keyMap[key];
+                selectSlot(Object.keys(BLOCK_TYPES)[index]);
+                e.preventDefault();
             }
         }
 
-        function initInventory() {
-            const inventoryElement = document.getElementById('inventory');
-            inventoryElement.innerHTML = `
-                <div class="inventory-page active" data-page="0"></div>
-                <div class="inventory-page" data-page="1"></div>
-            `;
-
-            Object.entries(BLOCK_TYPES).forEach(([type, data], index) => {
-                const page = Math.floor(index / 12);
-                const pageElement = inventoryElement.querySelector(`[data-page="${page}"]`);
-                const hotkey = HOTKEYS[index];
-                
-                const slot = document.createElement('div');
-                slot.className = `slot ${index === 0 ? 'active' : ''}`;
-                slot.style.backgroundColor = `#${new THREE.Color(data.color).getHexString()}`;
-                slot.dataset.type = type;
-                
-                const key = document.createElement('div');
-                key.className = 'slot-key';
-                key.textContent = hotkey.toUpperCase();
-                
-                const name = document.createElement('div');
-                name.style.cssText = 'position: absolute; top: 18px; left: 2px; font-size: 8px; color: #000;';
-                name.textContent = data.name;
-                
-                slot.appendChild(key);
-                slot.appendChild(name);
-                pageElement.appendChild(slot);
-            });
-        }
-
-        function selectSlot(type) {
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
-            const slot = document.querySelector(`.slot[data-type="${type}"]`);
-            if(slot) slot.classList.add('active');
-            currentBlockType = type;
-        }
-
-        function switchInventoryPage(page) {
-            currentInventoryPage = page;
-            document.querySelectorAll('.inventory-page').forEach(p => 
-                p.classList.remove('active'));
-            document.querySelector(`.inventory-page[data-page="${page}"]`).classList.add('active');
-        }
-
-        function saveWorld() {
-            const saveData = Array.from(blocks.values()).map(block => ({
-                x: block.position.x,
-                y: block.position.y,
-                z: block.position.z,
-                type: block.userData.type
-            }));
-            localStorage.setItem('world', JSON.stringify(saveData));
-        }
-
-        function loadWorld() {
-            const saveData = JSON.parse(localStorage.getItem('world') || '[]');
-            saveData.forEach(block => addBlock(block.x, block.y, block.z, block.type));
-        }
-
-        function initEventListeners() {
-            document.addEventListener('click', () => document.body.requestPointerLock());
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousedown', onMouseDown);
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function onMouseMove(e) {
-            if(document.pointerLockElement === document.body) {
-                player.yaw -= e.movementX * 0.002;
-                player.pitch = THREE.MathUtils.clamp(
-                    player.pitch - e.movementY * 0.002,
-                    -Math.PI/2,
-                    Math.PI/2
-                );
-                camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-            }
-        }
-
-        function onKeyDown(e) {
-            const key = e.key.toLowerCase();
-            keys[key] = true;
+        if(key === 'q') {
+            toggleQuickMenu();
+            return;
+                        }
             
             if(key === 'e') toggleInventory();
-            
-            const keyIndex = HOTKEYS.indexOf(key);
-            if(keyIndex > -1 && keyIndex < Object.keys(BLOCK_TYPES).length) {
-                selectSlot(Object.keys(BLOCK_TYPES)[keyIndex]);
-            }
         }
 
         function onKeyUp(e) {
@@ -431,7 +528,7 @@
             
             if(creativeMode) {
                 if(keys[' ']) moveVector.y += 1;
-                if(keys['shift']) moveVector.y -= 1;
+                if(keys.shift) moveVector.y -= 1;
             }
 
             moveVector.normalize();
@@ -527,6 +624,120 @@
             inv.style.display = inv.style.display === 'none' ? 'flex' : 'none';
         }
 
+        function toggleQuickMenu() {
+            const menu = document.getElementById('quick-menu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            refreshSaveList();
+            refreshControlsList();
+        }
+
+        function switchMenuTab(tabId) {
+            document.querySelectorAll('.menu-page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.menu-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${tabId}-page`).classList.add('active');
+            document.querySelector(`[onclick="switchMenuTab('${tabId}')"]`).classList.add('active');
+        }
+
+        function saveWithName() {
+            const saveName = document.getElementById('save-name').value;
+            if(!saveName) return;
+            
+            const saveData = {
+                world: Array.from(blocks.values()).map(block => ({
+                    x: block.position.x,
+                    y: block.position.y,
+                    z: block.position.z,
+                    type: block.userData.type
+                })),
+                settings: {
+                    controls: KEY_BINDINGS,
+                    interface: {
+                        primaryColor: getComputedStyle(document.documentElement)
+                            .getPropertyValue('--primary-color')
+                    }
+                }
+            };
+
+            localStorage.setItem(`save_${saveName}`, JSON.stringify(saveData));
+            refreshSaveList();
+        }
+
+        function loadSave(saveName) {
+            const saveData = JSON.parse(localStorage.getItem(`save_${saveName}`));
+            blocks.forEach(block => scene.remove(block));
+            blocks.clear();
+            saveData.world.forEach(block => addBlock(block.x, block.y, block.z, block.type));
+            applySettings(saveData.settings);
+        }
+
+        function applySettings(settings) {
+            Object.assign(KEY_BINDINGS, settings.controls);
+            document.documentElement.style.setProperty(
+                '--primary-color', 
+                settings.interface.primaryColor
+            );
+        }
+
+        function refreshSaveList() {
+            const saves = Object.keys(localStorage)
+                .filter(k => k.startsWith('save_'))
+                .map(k => k.replace('save_', ''));
+            
+            const list = document.getElementById('save-list');
+            list.innerHTML = saves.map(name => `
+                <div class="save-item">
+                    ${name}
+                    <button onclick="loadSave('${name}')">Загрузить</button>
+                    <button onclick="deleteSave('${name}')">Удалить</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteSave(saveName) {
+            localStorage.removeItem(`save_${saveName}`);
+            refreshSaveList();
+        }
+
+        function refreshControlsList() {
+            const list = document.getElementById('controls-list');
+            list.innerHTML = Object.entries(KEY_BINDINGS).map(([action, key]) => `
+                <div class="control-item">
+                    <span>${action.replace(/([A-Z])/g, ' $1').trim()}</span>
+                    <button onclick="remapControl('${action}')">${key.toUpperCase()}</button>
+                </div>
+            `).join('');
+        }
+
+        function remapControl(action) {
+            const listener = e => {
+                KEY_BINDINGS[action] = e.key.toLowerCase();
+                document.removeEventListener('keydown', listener);
+                refreshControlsList();
+            };
+            document.addEventListener('keydown', listener);
+        }
+
+        function initColorPicker() {
+            const colors = [
+                '#0088cc', '#20c997', '#dc3545', '#ffc107', 
+                '#6610f2', '#fd7e14', '#e83e8c', '#6f42c1'
+            ];
+            
+            const picker = document.getElementById('color-picker');
+            picker.innerHTML = colors.map(color => `
+                <div class="color-option" 
+                     style="background: ${color}"
+                     onclick="selectColor('${color}')"></div>
+            `).join('');
+        }
+
+        function selectColor(color) {
+            document.documentElement.style.setProperty('--primary-color', color);
+            document.querySelectorAll('.color-option').forEach(o => 
+                o.classList.remove('selected'));
+            event.target.classList.add('selected');
+        }
+
         function animate() {
             requestAnimationFrame(animate);
             const delta = Math.min(0.05, clock.getDelta());
@@ -538,8 +749,7 @@
             renderer.render(scene, camera);
         }
 
-        // Автосохранение каждые 30 секунд
-        setInterval(saveWorld, 30000);
+        setInterval(saveWorld, 120000);
     </script>
 </body>
 </html>
